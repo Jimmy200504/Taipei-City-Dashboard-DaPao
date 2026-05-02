@@ -1,0 +1,37 @@
+{
+    "dag_infos": {
+        "dag_id": "D990103",
+        "start_date": "2026-05-01",
+        "schedule_interval": "0 6 16 * *",
+        "catchup": false,
+        "tags": ["env_noise", "噪音", "aggregation"],
+        "description": "Compute quarterly noise stats and district summary from monthly measurements.",
+        "default_args": {
+            "owner": "airflow",
+            "email": ["DEFAULT_EMAIL_LIST"],
+            "email_on_retry": false,
+            "email_on_failure": true,
+            "retries": 1,
+            "retry_delay": 60
+        },
+        "ready_data_db": "postgres_default",
+        "ready_data_default_table": "env_noise_quarterly_stats",
+        "ready_data_history_table": "",
+        "raw_data_db": "postgres_default",
+        "raw_data_table": "",
+        "load_behavior": "replace"
+    },
+    "data_infos": {
+        "name_cn": "噪音監測季別聚合與行政區彙整",
+        "airflow_update_freq": "06:00+8 16th every month",
+        "source": "derived from env_noise_monthly_measurements",
+        "source_type": "derived",
+        "source_dept": "臺北市環境保護局 / 新北市環境保護局",
+        "gis_format": null,
+        "output_coordinate": null,
+        "is_geometry": 0,
+        "dataset_description": "噪音監測季別聚合統計（按 city_scope/noise_category/quarter/period 彙整），及行政區超標率彙整，供前端折線圖、熱度圖、長條圖使用",
+        "etl_description": "read env_noise_monthly_measurements, compute quarterly avg/max/min per period, compute district exceed rates, replace both aggregation tables, update total_exceed_count on stations",
+        "sensitivity": "public"
+    }
+}

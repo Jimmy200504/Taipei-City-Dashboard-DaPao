@@ -1,0 +1,37 @@
+{
+    "dag_infos": {
+        "dag_id": "D990101",
+        "start_date": "2026-05-01",
+        "schedule_interval": "0 3 16 * *",
+        "catchup": false,
+        "tags": ["env_noise", "臺北市環保局", "噪音"],
+        "description": "Monthly noise measurement data scraped from Taipei EPA website.",
+        "default_args": {
+            "owner": "airflow",
+            "email": ["DEFAULT_EMAIL_LIST"],
+            "email_on_retry": false,
+            "email_on_failure": true,
+            "retries": 1,
+            "retry_delay": 60
+        },
+        "ready_data_db": "postgres_default",
+        "ready_data_default_table": "env_noise_quarterly_stats_tpe",
+        "ready_data_history_table": "",
+        "raw_data_db": "postgres_default",
+        "raw_data_table": "",
+        "load_behavior": "append"
+    },
+    "data_infos": {
+        "name_cn": "臺北市噪音監測月份量測值",
+        "airflow_update_freq": "03:00+8 16th every month",
+        "source": "https://www.tldep.gov.taipei/Public/DetInformation/NoiseQuality.aspx",
+        "source_type": "web_scraping",
+        "source_dept": "臺北市環境保護局",
+        "gis_format": null,
+        "output_coordinate": "EPSG:4326",
+        "is_geometry": 0,
+        "dataset_description": "臺北市噪音監測站每月日間/晚間/夜間均能音量量測值，含交通噪音與環境噪音兩類",
+        "etl_description": "scrape HTML table from Taipei EPA noise quality page, parse station metadata and dB values, handle special symbols (*/- /#/&), upsert to monthly measurements and station master tables",
+        "sensitivity": "public"
+    }
+}

@@ -58,6 +58,184 @@ import {
 	mrtLineColor,
 } from "../assets/utilityFunctions/getThematicColor.js";
 
+const riverRpiColorStops = [
+	1,
+	"#67baca",
+	3.5,
+	"#f8cf58",
+	6,
+	"#f5ad4a",
+	10,
+	"#ed6a45",
+];
+
+function isRiverRpiSegmentLayer(mapConfig) {
+	return (
+		mapConfig?.type === "line" &&
+		mapConfig?.index?.startsWith("env_river_segments_")
+	);
+}
+
+function getRiverRpiLinePaint() {
+	return {
+		"line-color": [
+			"interpolate",
+			["linear"],
+			["to-number", ["get", "rpi_value"], 0],
+			...riverRpiColorStops,
+		],
+		"line-width": [
+			"interpolate",
+			["linear"],
+			["zoom"],
+			9,
+			5,
+			12,
+			7,
+			16,
+			10,
+		],
+		"line-opacity": 0.95,
+		"line-blur": 0.15,
+	};
+}
+
+function getRiverRpiLineLayout() {
+	return {
+		"line-cap": "round",
+		"line-join": "round",
+	};
+}
+
+function getNumericRpi(value) {
+	const numericValue = Number(value);
+	return Number.isFinite(numericValue) ? numericValue : null;
+}
+
+function interpolateNumber(start, end, ratio) {
+	return start + (end - start) * ratio;
+}
+
+function interpolateCoordinate(start, end, ratio) {
+	return [
+		interpolateNumber(start[0], end[0], ratio),
+		interpolateNumber(start[1], end[1], ratio),
+	];
+}
+
+function getLegDistance(start, end) {
+	return distance(point(start), point(end), { units: "kilometers" });
+}
+
+function getSegmentPieceCount(legDistance, totalDistance) {
+	if (totalDistance <= 0) {
+		return 1;
+	}
+
+	return Math.max(1, Math.ceil((legDistance / totalDistance) * 36));
+}
+
+function getLineProgress({
+	completedDistance,
+	coordinates,
+	endRatio,
+	index,
+	legDistance,
+	startRatio,
+	totalDistance,
+}) {
+	if (totalDistance > 0) {
+		const midpointRatio = (startRatio + endRatio) / 2;
+		return (completedDistance + legDistance * midpointRatio) / totalDistance;
+	}
+
+	return (index + (startRatio + endRatio) / 2) / (coordinates.length - 1);
+}
+
+function getRiverRpiPiecesForLine(feature, coordinates) {
+	const upstreamRpi = getNumericRpi(feature.properties?.upstream_rpi);
+	const downstreamRpi = getNumericRpi(feature.properties?.downstream_rpi);
+
+	if (
+		coordinates.length < 2 ||
+		upstreamRpi === null ||
+		downstreamRpi === null
+	) {
+		return [];
+	}
+
+	const legDistances = coordinates.slice(0, -1).map((coord, index) => {
+		return getLegDistance(coord, coordinates[index + 1]);
+	});
+	const totalDistance = legDistances.reduce((sum, item) => sum + item, 0);
+	let completedDistance = 0;
+
+	return coordinates.slice(0, -1).flatMap((start, index) => {
+		const end = coordinates[index + 1];
+		const legDistance = legDistances[index];
+		const pieceCount = getSegmentPieceCount(legDistance, totalDistance);
+		const pieces = [];
+
+		for (let pieceIndex = 0; pieceIndex < pieceCount; pieceIndex++) {
+			const startRatio = pieceIndex / pieceCount;
+			const endRatio = (pieceIndex + 1) / pieceCount;
+			const progress = getLineProgress({
+				completedDistance,
+				coordinates,
+				endRatio,
+				index,
+				legDistance,
+				startRatio,
+				totalDistance,
+			});
+
+			pieces.push({
+				type: "Feature",
+				properties: {
+					...feature.properties,
+					rpi_value: interpolateNumber(
+						upstreamRpi,
+						downstreamRpi,
+						progress,
+					),
+					segment_piece_id: `${feature.properties?.segment_id || "river"}-${index}-${pieceIndex}`,
+				},
+				geometry: {
+					type: "LineString",
+					coordinates: [
+						interpolateCoordinate(start, end, startRatio),
+						interpolateCoordinate(start, end, endRatio),
+					],
+				},
+			});
+		}
+
+		completedDistance += legDistance;
+		return pieces;
+	});
+}
+
+function getRiverRpiLineStrings(feature) {
+	if (feature.geometry?.type === "LineString") {
+		return [feature.geometry.coordinates];
+	}
+	if (feature.geometry?.type === "MultiLineString") {
+		return feature.geometry.coordinates;
+	}
+	return [];
+}
+
+function getRiverRpiSegmentGeojson(data) {
+	return {
+		...data,
+		features: data.features.flatMap((feature) => {
+			return getRiverRpiLineStrings(feature).flatMap((coordinates) => {
+				return getRiverRpiPiecesForLine(feature, coordinates);
+			});
+		}),
+	};
+}
+
 export const useMapStore = defineStore("map", {
 	state: () => ({
 		// Array of layer IDs that are in the map
@@ -462,21 +640,26 @@ export const useMapStore = defineStore("map", {
 		},
 		// 3-1. Add a local geojson as a source in mapbox
 		addGeojsonSource(map_config, data) {
+			let geojsonData = data;
+			if (isRiverRpiSegmentLayer(map_config)) {
+				geojsonData = getRiverRpiSegmentGeojson(data);
+			}
+
 			if (
 				!["voronoi", "isoline"].includes(map_config.type) &&
 				map_config.type !== "symbol-3d"
 			) {
 				this.map.addSource(`${map_config.layerId}-source`, {
 					type: "geojson",
-					data: { ...data },
+					data: { ...geojsonData },
 				});
 			}
 			if (map_config.type === "arc") {
-				this.AddArcMapLayer(map_config, data);
+				this.AddArcMapLayer(map_config, geojsonData);
 			} else if (map_config.type === "voronoi") {
-				this.AddVoronoiMapLayer(map_config, data);
+				this.AddVoronoiMapLayer(map_config, geojsonData);
 			} else if (map_config.type === "isoline") {
-				this.AddIsolineMapLayer(map_config, data);
+				this.AddIsolineMapLayer(map_config, geojsonData);
 			} else {
 				this.addMapLayer(map_config);
 			}
@@ -655,10 +838,14 @@ export const useMapStore = defineStore("map", {
 					...maplayerCommonPaint[`${map_config.type}`],
 					...extra_paint_configs,
 					...map_config.paint,
+					...(isRiverRpiSegmentLayer(map_config) &&
+						getRiverRpiLinePaint()),
 				},
 				layout: {
 					...maplayerCommonLayout[`${map_config.type}`],
 					...extra_layout_configs,
+					...(isRiverRpiSegmentLayer(map_config) &&
+						getRiverRpiLineLayout()),
 				},
 				source: `${map_config.layerId}-source`,
 			};

@@ -1,7 +1,35 @@
 <!-- Developed by Taipei Urban Intelligence Center 2023-2024-->
 
 <!-- This component is mounted programmically by the mapstore. "mapConfig" and "popupContent" are passed in in the mapStore -->
-<script setup></script>
+<script setup>
+const riskLevelLabels = {
+	unpolluted: "未受污染",
+	mild: "輕度污染",
+	moderate: "中度污染",
+	severe: "嚴重污染",
+	incomplete: "資料不足",
+};
+
+const geometrySourceLabels = {
+	real_river: "實際河道",
+	straight_line: "直線示意",
+};
+
+function formatPopupValue(key, value) {
+	if (value === null || value === undefined || value === "") {
+		return "-";
+	}
+
+	switch (key) {
+	case "risk_level":
+		return riskLevelLabels[value] || value;
+	case "geometry_source":
+		return geometrySourceLabels[value] || value;
+	default:
+		return value;
+	}
+}
+</script>
 
 <template>
   <div class="mappopup">
@@ -79,7 +107,14 @@
         </div>
         <div v-else>
           <h3>{{ item.name }}</h3>
-          <p>{{ popupContent[activeTab]?.properties[item.key] }}</p>
+          <p>
+            {{
+              formatPopupValue(
+                item.key,
+                popupContent[activeTab]?.properties[item.key],
+              )
+            }}
+          </p>
         </div>
       </div>
     </div>

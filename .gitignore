@@ -75,3 +75,4 @@ Taipei-City-Dashboard-DE/docker/prod/.env
 *.env
 AGENTS.md
 CLAUDE.md
+prompt.md

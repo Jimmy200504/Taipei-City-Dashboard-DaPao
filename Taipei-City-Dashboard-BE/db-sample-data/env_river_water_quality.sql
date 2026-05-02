@@ -51,14 +51,14 @@ DECLARE
   segs_mtp_id   integer;
   high_idx      text := 'river_high_risk_sites';
   dist_idx      text := 'river_risk_distribution';
-  src_label     text := '環境部水質監測 GIS';
-  high_short    text := '依環境部最新月份 RPI 由高至低排序，呈現雙北高風險河川測站。';
-  high_long     text := '本圖以環境部 RPI（河川污染指數）追蹤雙北河川水質風險，列出最新月份 RPI 數值最高的前 10 座測站。RPI 直接取自環境部 WQ_Index，不重新計算；缺值或無檢測資料的測站不入排名。資料月更新，可協助識別需要優先關注的測站。';
-  high_use      text := '可用於聚焦近期水質惡化熱點：將排名與測站位置、所在河川與行政區交叉比對，協助環保稽查、河川治理與民眾風險溝通；亦可搭配風險等級分布圖檢視整體變化。';
-  dist_short    text := '依風險等級統計雙北河川測站數，呈現整體水質結構。';
-  dist_long     text := '本圖統計最新月份各風險等級（未受污染／輕度／中度／嚴重）的測站數，反映雙北河川整體水質結構。RPI 風險等級由環境部 WQ_Index_Dec 直接判定，無檢測資料之測站不入分母。';
+  src_label     text := '環境部水質監測 GIS（含其他單位河川測站）';
+  high_short    text := '合併環境部官方與其他單位河川測站，依最新月份 RPI 由高至低排序，呈現雙北高風險測站。';
+  high_long     text := '本圖以 RPI（河川污染指數）追蹤雙北河川水質風險，列出最新月份 RPI 數值最高的前 10 座測站。資料來源含兩類：(1) 環境部官方測站直接取用 WQ_Index；(2) 其他單位（地方環保局等）測站則以 DO/BOD5/SS/NH3-N 四項指標分數平均計算 RPI。缺值或子指標不全者不入排名。資料月更新，協助識別需要優先關注的測站。';
+  high_use      text := '可用於聚焦近期水質惡化熱點：將排名與測站位置、所在河川與行政區交叉比對，協助環保稽查、河川治理與民眾風險溝通；亦可搭配風險等級分布圖檢視整體變化。RPI 計算方式（直接取用 vs. 重新計算）會在 popup 標註。';
+  dist_short    text := '依風險等級統計雙北河川測站數（含其他單位測站），呈現整體水質結構。';
+  dist_long     text := '本圖統計最新月份各風險等級（未受污染／輕度／中度／嚴重）的測站數，反映雙北河川整體水質結構。包含環境部官方測站（取自 WQ_Index_Dec）以及由本平台從 DO/BOD5/SS/NH3-N 四項指標重新計算 RPI 的其他單位測站。無檢測資料或子指標不全之測站不入分母。';
   dist_use      text := '配合排名圖可一覽水質結構：嚴重／中度污染比例變化可作為政策成效追蹤指標，並協助比較臺北市單市與雙北範圍下的差異。';
-  links         text[] := ARRAY['https://wq.moenv.gov.tw/EWQP_GIS/dataFile/AJAX_Main.aspx?Type=Get_point_WQStation_River','https://gic.wra.gov.tw/gis/gic/API/Google/DownLoad.aspx?fname=RIVER&filetype=SHP'];
+  links         text[] := ARRAY['https://wq.moenv.gov.tw/EWQP_GIS/dataFile/AJAX_Main.aspx?Type=Get_point_WQStation_River','https://wq.moenv.gov.tw/EWQP_GIS/dataFile/AJAX_Main.aspx?Type=Get_point_WQStation_Ext_River','https://gic.wra.gov.tw/gis/gic/API/Google/DownLoad.aspx?fname=RIVER&filetype=SHP'];
   contributors  text[] := ARRAY['doit','ntpc'];
 
   paint_circle  json := $paint$
@@ -92,13 +92,21 @@ DECLARE
 
   prop_site     json := $prop$
     [
-      {"key": "site_name",     "name": "測站"},
-      {"key": "rpi_value",     "name": "RPI"},
-      {"key": "risk_level",    "name": "風險等級"},
-      {"key": "sample_month",  "name": "採樣月份"},
-      {"key": "district",      "name": "行政區"},
-      {"key": "river",         "name": "河川"},
-      {"key": "wq_std_grade",  "name": "水體分類等級"}
+      {"key": "site_name",          "name": "測站"},
+      {"key": "rpi_value",          "name": "RPI"},
+      {"key": "risk_level",         "name": "風險等級"},
+      {"key": "rpi_method",         "name": "RPI 計算方式"},
+      {"key": "sample_month",       "name": "採樣月份"},
+      {"key": "district",           "name": "行政區"},
+      {"key": "river",              "name": "河川"},
+      {"key": "wq_std_grade",       "name": "水體分類等級"},
+      {"key": "source_label",       "name": "資料來源"},
+      {"key": "do_value",           "name": "DO 溶氧 (mg/L)"},
+      {"key": "do_method",          "name": "DO 量測方法"},
+      {"key": "bod5_value",         "name": "BOD5 (mg/L)"},
+      {"key": "ss_value",           "name": "SS 懸浮固體 (mg/L)"},
+      {"key": "nh3n_value",         "name": "NH3-N 氨氮 (mg/L)"},
+      {"key": "conductivity_value", "name": "導電度 (μS/cm)"}
     ]
   $prop$::json;
 

@@ -16,10 +16,14 @@ def _env_river_water_quality(**kwargs):
 
     from proj_city_dashboard.env_river_water_quality.river_water_quality_lib import (
         build_river_segments,
+        enrich_ext_do_from_detail_pages,
         export_geojson_layers,
+        fetch_river_ext_station_records,
         fetch_river_station_records,
         fetch_wra_river_geodataframe,
         load_curated_route_geodataframe,
+        merge_normalized_frames,
+        normalize_ext_records,
         normalize_records,
     )
 
@@ -43,8 +47,18 @@ def _env_river_water_quality(**kwargs):
 
     data_time = get_tpe_now_time_str(is_with_tz=True)
     session = requests.Session()
-    records = fetch_river_station_records(session)
-    sites_df, latest_df = normalize_records(records, data_time)
+
+    official_records = fetch_river_station_records(session)
+    official_sites_df, official_latest_df = normalize_records(official_records, data_time)
+
+    ext_records = fetch_river_ext_station_records(session)
+    ext_sites_df, ext_latest_df = normalize_ext_records(ext_records, data_time)
+    ext_latest_df = enrich_ext_do_from_detail_pages(ext_latest_df, session=session)
+
+    sites_df, latest_df = merge_normalized_frames(
+        [official_sites_df, ext_sites_df],
+        [official_latest_df, ext_latest_df],
+    )
 
     if sites_df.empty:
         raise ValueError("No 臺北市/新北市 river stations were extracted from MOENV.")

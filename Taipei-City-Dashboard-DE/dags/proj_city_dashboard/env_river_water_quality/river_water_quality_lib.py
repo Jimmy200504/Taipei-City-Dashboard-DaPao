@@ -1,3 +1,4 @@
+import html as html_module
 import json
 import logging
 import math
@@ -18,6 +19,18 @@ MOENV_RIVER_STATIONS_URL = (
     "https://wq.moenv.gov.tw/EWQP_GIS/dataFile/AJAX_Main.aspx"
     "?Type=Get_point_WQStation_River"
 )
+MOENV_RIVER_EXT_STATIONS_URL = (
+    "https://wq.moenv.gov.tw/EWQP_GIS/dataFile/AJAX_Main.aspx"
+    "?Type=Get_point_WQStation_Ext_River"
+)
+MOENV_RIVER_DETAIL_URL_TEMPLATE = (
+    "https://wq.moenv.gov.tw/EWQP/zh/EnvWaterMonitoring/RiverWaterQuality.aspx"
+    "?Func=FromGIS&Qry={site_id}&Parent1={mgmt_id}&Parent2="
+)
+MOENV_DETAIL_USER_AGENT = (
+    "Mozilla/5.0 (compatible; TaipeiCityDashboard/1.0; "
+    "+https://citydashboard.taipei)"
+)
 
 WRA_RIVER_SHAPEFILE_URL = (
     "https://gic.wra.gov.tw/gis/gic/API/Google/DownLoad.aspx"
@@ -31,6 +44,14 @@ RIVER_NAME_ALIAS = {
 }
 
 SOURCE_NAME = "環境部"
+SOURCE_LABEL_MOENV_RIVER = "moenv_river"
+SOURCE_LABEL_MOENV_EXT_RIVER = "moenv_ext_river"
+RPI_METHOD_SOURCE_WQ_INDEX = "source_wq_index"
+RPI_METHOD_CALCULATED_FROM_ITEMS = "calculated_from_items"
+DO_METHOD_EXT_ENDPOINT = "ext_endpoint"
+DO_METHOD_DETAIL_ELECTRODE = "detail_electrode"
+DO_METHOD_DETAIL_TITRATION = "detail_titration"
+EXT_SITE_ID_PREFIX = "ext"
 TARGET_CITIES = ("臺北市", "新北市")
 
 RPI_FLAG_COMPLETE = "complete"
@@ -48,6 +69,8 @@ RISK_LEVEL_MAP = {
 }
 
 INCOMPLETE_LABEL = "無檢測資料"
+EXT_INCOMPLETE_LABEL = "近期無檢測資料"
+EXT_MISSING_VALUE_TOKENS = {"－", "-", "—", "N/A", "NA"}
 
 STATION_OFF_RIVER_TOLERANCE_M = 1500.0
 ROUTE_ENDPOINT_SNAP_TOLERANCE_M = 750.0
@@ -57,6 +80,7 @@ _MONTH_PATTERN = re.compile(r"(\d{3,4})\s*年\s*(\d{1,2})\s*月")
 
 _SITE_COLUMNS = [
     "source_name",
+    "source_label",
     "city",
     "district",
     "basin",
@@ -74,6 +98,8 @@ _SITE_COLUMNS = [
 
 _LATEST_COLUMNS = [
     "source_name",
+    "source_label",
+    "rpi_method",
     "city",
     "district",
     "basin",
@@ -88,10 +114,33 @@ _LATEST_COLUMNS = [
     "risk_level",
     "risk_level_order",
     "rpi_flag",
+    "do_value",
+    "bod5_value",
+    "ss_value",
+    "nh3n_value",
+    "conductivity_value",
+    "do_score",
+    "bod5_score",
+    "ss_score",
+    "nh3n_score",
+    "do_method",
     "data_time",
     "longitude",
     "latitude",
 ]
+
+_INDICATOR_COLUMNS = (
+    "do_value",
+    "bod5_value",
+    "ss_value",
+    "nh3n_value",
+    "conductivity_value",
+    "do_score",
+    "bod5_score",
+    "ss_score",
+    "nh3n_score",
+    "do_method",
+)
 
 _SEGMENT_COLUMNS = [
     "segment_id",
@@ -124,12 +173,27 @@ def fetch_river_station_records(
     session: Optional[requests.Session] = None,
     timeout: int = 30,
 ) -> list:
+    return _fetch_moenv_records(MOENV_RIVER_STATIONS_URL, session, timeout)
+
+
+def fetch_river_ext_station_records(
+    session: Optional[requests.Session] = None,
+    timeout: int = 30,
+) -> list:
+    return _fetch_moenv_records(MOENV_RIVER_EXT_STATIONS_URL, session, timeout)
+
+
+def _fetch_moenv_records(
+    url: str,
+    session: Optional[requests.Session],
+    timeout: int,
+) -> list:
     sess = session or requests.Session()
-    response = sess.get(MOENV_RIVER_STATIONS_URL, timeout=timeout)
+    response = sess.get(url, timeout=timeout)
     response.raise_for_status()
     payload = response.json()
     if not isinstance(payload, list):
-        raise ValueError("MOENV river-station endpoint returned non-list payload.")
+        raise ValueError(f"MOENV endpoint {url!r} returned non-list payload.")
     return payload
 
 
@@ -190,6 +254,8 @@ def normalize_records(records: list, data_time: str) -> Tuple[pd.DataFrame, pd.D
     df = df[df["site_id"] != ""].drop_duplicates(subset=["site_id"], keep="last")
 
     df["source_name"] = SOURCE_NAME
+    df["source_label"] = SOURCE_LABEL_MOENV_RIVER
+    df["rpi_method"] = RPI_METHOD_SOURCE_WQ_INDEX
     df["city"] = df["County_Name"]
     df["district"] = df["Town_Cname"]
     df["basin"] = df["Basin_Name"]
@@ -217,7 +283,512 @@ def normalize_records(records: list, data_time: str) -> Tuple[pd.DataFrame, pd.D
     df.loc[rpi_missing, "risk_level"] = None
     df.loc[rpi_missing, "risk_level_order"] = pd.NA
 
+    for col in _INDICATOR_COLUMNS:
+        df[col] = None
+
     return df[_SITE_COLUMNS].copy(), df[_LATEST_COLUMNS].copy()
+
+
+def _strip_ext_site_id(site_id: str) -> Optional[Tuple[str, str]]:
+    """Reverse the ``ext:{SiteMgt_ID}:{SiteID}`` prefix back to its parts."""
+    if not isinstance(site_id, str):
+        return None
+    parts = site_id.split(":", 2)
+    if len(parts) != 3 or parts[0] != EXT_SITE_ID_PREFIX:
+        return None
+    if not parts[1] or not parts[2]:
+        return None
+    return parts[1], parts[2]
+
+
+_DETAIL_DO_PATTERN = re.compile(
+    r">\s*溶氧\s*\(\s*(電極法|滴定法)\s*\)\s*<.*?<dd[^>]*>(.*?)</dd>",
+    re.DOTALL,
+)
+_DETAIL_DDL_PATTERN_TEMPLATE = (
+    r"name=\"ctl00\$CPH1\${field}\"[^>]*>(.*?)</select>"
+)
+_DETAIL_SELECTED_OPTION_PATTERN = re.compile(
+    r'<option\b(?=[^>]*\bselected\b)[^>]*\bvalue="([^"]+)"',
+    re.IGNORECASE,
+)
+
+
+def fetch_river_detail_page(
+    site_id: str,
+    mgmt_id: str,
+    session: Optional[requests.Session] = None,
+    timeout: int = 20,
+) -> str:
+    """GET the per-site MOENV detail page and return the HTML body.
+
+    The page defaults to the latest available month for the requested site.
+    A custom User-Agent is sent because the upstream rejects empty UA strings.
+    """
+    if not site_id or not mgmt_id:
+        raise ValueError("site_id and mgmt_id are required.")
+    sess = session or requests.Session()
+    url = MOENV_RIVER_DETAIL_URL_TEMPLATE.format(
+        site_id=str(site_id), mgmt_id=str(mgmt_id)
+    )
+    response = sess.get(
+        url, timeout=timeout, headers={"User-Agent": MOENV_DETAIL_USER_AGENT}
+    )
+    response.raise_for_status()
+    return response.text
+
+
+def parse_detail_page_year_month(html_text: str) -> Tuple[Optional[int], Optional[int]]:
+    """Read the currently selected year/month from the detail page dropdowns."""
+    if not html_text:
+        return None, None
+    year_year = _read_selected_dropdown(html_text, "ddl_Year")
+    month_month = _read_selected_dropdown(html_text, "ddl_Month")
+    year_int = _safe_int(year_year)
+    month_int = _safe_int(month_month)
+    return year_int, month_int
+
+
+def _read_selected_dropdown(html_text: str, field: str) -> Optional[str]:
+    pattern = re.compile(
+        _DETAIL_DDL_PATTERN_TEMPLATE.format(field=re.escape(field)), re.DOTALL
+    )
+    block = pattern.search(html_text)
+    if not block:
+        return None
+    sel = _DETAIL_SELECTED_OPTION_PATTERN.search(block.group(1))
+    return sel.group(1) if sel else None
+
+
+def _safe_int(value: Optional[str]) -> Optional[int]:
+    if value is None:
+        return None
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_do_from_detail_html(
+    html_text: str,
+) -> Tuple[Optional[float], Optional[str]]:
+    """Extract DO from the detail-page data cards.
+
+    Returns ``(value, method)`` where ``method`` is
+    ``DO_METHOD_DETAIL_ELECTRODE`` or ``DO_METHOD_DETAIL_TITRATION``.
+    Electrode (電極法) is preferred and returned first when available;
+    titration (滴定法) is the fallback. ``(None, None)`` if neither method
+    has a usable numeric value.
+    """
+    if not html_text:
+        return None, None
+
+    found: Dict[str, Optional[float]] = {
+        DO_METHOD_DETAIL_ELECTRODE: None,
+        DO_METHOD_DETAIL_TITRATION: None,
+    }
+    for method_label, raw_value in _DETAIL_DO_PATTERN.findall(html_text):
+        method_key = (
+            DO_METHOD_DETAIL_ELECTRODE
+            if "電極" in method_label
+            else DO_METHOD_DETAIL_TITRATION
+        )
+        if found[method_key] is not None:
+            continue
+        parsed = parse_indicator_value(html_module.unescape(raw_value).strip())
+        if parsed is not None:
+            found[method_key] = parsed
+
+    if found[DO_METHOD_DETAIL_ELECTRODE] is not None:
+        return found[DO_METHOD_DETAIL_ELECTRODE], DO_METHOD_DETAIL_ELECTRODE
+    if found[DO_METHOD_DETAIL_TITRATION] is not None:
+        return found[DO_METHOD_DETAIL_TITRATION], DO_METHOD_DETAIL_TITRATION
+    return None, None
+
+
+def enrich_ext_do_from_detail_pages(
+    latest_df: pd.DataFrame,
+    session: Optional[requests.Session] = None,
+    fetch_fn=None,
+) -> pd.DataFrame:
+    """Fill missing DO on Ext rows by scraping the per-site MOENV detail page.
+
+    Only rows that satisfy ALL of these are touched:
+
+    - ``source_label == 'moenv_ext_river'``
+    - ``do_value`` is missing
+    - ``sample_month`` is set (skip stations with no recent data)
+    - At least one of BOD5/SS/NH3-N is present (no point burning HTTP for
+      stations whose other indicators are also missing)
+
+    For each touched row, the page's currently selected year/month must
+    match the row's ``sample_month``; otherwise the page is showing stale
+    data and we leave the row alone.
+
+    On success, ``do_value`` / ``do_score`` / ``do_method`` are set, and
+    ``rpi_value`` / ``risk_level`` / ``risk_level_order`` / ``rpi_flag``
+    are recomputed from the four updated indicator scores.
+
+    HTTP failures are logged and the row is left unchanged; the DAG does
+    not fail because of detail-page issues.
+
+    ``fetch_fn`` is an injection point for tests (default uses
+    :func:`fetch_river_detail_page`).
+    """
+    if latest_df is None or latest_df.empty:
+        return latest_df
+
+    if "source_label" not in latest_df.columns:
+        return latest_df
+
+    if fetch_fn is None:
+        sess = session or requests.Session()
+
+        def fetch_fn(site_id, mgmt_id):
+            return fetch_river_detail_page(site_id, mgmt_id, session=sess)
+
+    df = latest_df.copy()
+    target_mask = (
+        (df["source_label"] == SOURCE_LABEL_MOENV_EXT_RIVER)
+        & df["do_value"].isna()
+        & df["sample_month"].notna()
+        & (
+            df["bod5_value"].notna()
+            | df["ss_value"].notna()
+            | df["nh3n_value"].notna()
+        )
+    )
+    target_indexes = df.index[target_mask].tolist()
+    if not target_indexes:
+        return df
+
+    logger.info(
+        "Attempting DO enrichment from MOENV detail pages for %d Ext rows.",
+        len(target_indexes),
+    )
+
+    recovered = 0
+    for idx in target_indexes:
+        row = df.loc[idx]
+        ids = _strip_ext_site_id(row["site_id"])
+        if ids is None:
+            continue
+        mgmt_id, raw_site_id = ids
+
+        try:
+            html_text = fetch_fn(raw_site_id, mgmt_id)
+        except requests.RequestException as exc:
+            logger.warning(
+                "Detail-page fetch failed for %s: %s", row["site_id"], exc
+            )
+            continue
+        except Exception as exc:
+            logger.warning(
+                "Detail-page fetch raised unexpectedly for %s: %s",
+                row["site_id"],
+                exc,
+            )
+            continue
+
+        page_year, page_month = parse_detail_page_year_month(html_text)
+        sample = row["sample_month"]
+        sample_year = getattr(sample, "year", None)
+        sample_month_int = getattr(sample, "month", None)
+        if (
+            page_year is None
+            or page_month is None
+            or page_year != sample_year
+            or page_month != sample_month_int
+        ):
+            logger.info(
+                "Detail page month mismatch for %s: page=%s-%s sample=%s-%s",
+                row["site_id"],
+                page_year,
+                page_month,
+                sample_year,
+                sample_month_int,
+            )
+            continue
+
+        do_value, do_method = parse_do_from_detail_html(html_text)
+        if do_value is None:
+            continue
+
+        df.at[idx, "do_value"] = do_value
+        df.at[idx, "do_method"] = do_method
+        df.at[idx, "do_score"] = score_do(do_value)
+
+        new_rpi, new_scores, complete = compute_rpi_from_items(
+            do_value,
+            row["bod5_value"],
+            row["ss_value"],
+            row["nh3n_value"],
+        )
+        df.at[idx, "bod5_score"] = new_scores["bod5_score"]
+        df.at[idx, "ss_score"] = new_scores["ss_score"]
+        df.at[idx, "nh3n_score"] = new_scores["nh3n_score"]
+        df.at[idx, "rpi_value"] = new_rpi
+        risk_level, risk_order = map_rpi_to_risk_level(new_rpi)
+        df.at[idx, "risk_level"] = risk_level
+        df.at[idx, "risk_level_order"] = (
+            risk_order if risk_order is not None else pd.NA
+        )
+        df.at[idx, "rpi_flag"] = (
+            RPI_FLAG_COMPLETE if complete else RPI_FLAG_INCOMPLETE
+        )
+        recovered += 1
+
+    logger.info(
+        "DO enrichment recovered %d / %d Ext rows.", recovered, len(target_indexes)
+    )
+    return df
+
+
+def parse_indicator_value(value):
+    """Parse a raw MOENV indicator string.
+
+    `<X` (below detection limit) maps to 0 per user preference; full-width
+    dashes, empty strings, NaN and None map to ``None``.
+    """
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    text = str(value).strip()
+    if not text or text in EXT_MISSING_VALUE_TOKENS:
+        return None
+    if text.startswith("<"):
+        return 0.0
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def _is_missing_number(value) -> bool:
+    if value is None:
+        return True
+    try:
+        return bool(pd.isna(value))
+    except (TypeError, ValueError):
+        return False
+
+
+def score_do(value: Optional[float]) -> Optional[int]:
+    if _is_missing_number(value):
+        return None
+    if value >= 6.5:
+        return 1
+    if value >= 4.6:
+        return 3
+    if value >= 2.0:
+        return 6
+    return 10
+
+
+def score_bod5(value: Optional[float]) -> Optional[int]:
+    if _is_missing_number(value):
+        return None
+    if value <= 3.0:
+        return 1
+    if value < 5.0:
+        return 3
+    if value <= 15.0:
+        return 6
+    return 10
+
+
+def score_ss(value: Optional[float]) -> Optional[int]:
+    if _is_missing_number(value):
+        return None
+    if value <= 20:
+        return 1
+    if value < 50:
+        return 3
+    if value <= 100:
+        return 6
+    return 10
+
+
+def score_nh3n(value: Optional[float]) -> Optional[int]:
+    if _is_missing_number(value):
+        return None
+    if value <= 0.50:
+        return 1
+    if value < 1.00:
+        return 3
+    if value <= 3.00:
+        return 6
+    return 10
+
+
+def compute_rpi_from_items(
+    do: Optional[float],
+    bod5: Optional[float],
+    ss: Optional[float],
+    nh3n: Optional[float],
+) -> Tuple[Optional[float], Dict[str, Optional[int]], bool]:
+    """Compute average RPI from the four sub-indicators.
+
+    Returns ``(rpi, scores, complete)``. ``complete`` is False when any of
+    DO/BOD5/SS/NH3-N is missing; in that case ``rpi`` is None.
+    """
+    scores = {
+        "do_score": score_do(do),
+        "bod5_score": score_bod5(bod5),
+        "ss_score": score_ss(ss),
+        "nh3n_score": score_nh3n(nh3n),
+    }
+    if any(v is None for v in scores.values()):
+        return None, scores, False
+    rpi = sum(scores.values()) / 4.0
+    return rpi, scores, True
+
+
+def map_rpi_to_risk_level(rpi: Optional[float]) -> Tuple[Optional[str], Optional[int]]:
+    """Map a numeric RPI value to (risk_level, risk_level_order).
+
+    Thresholds: ``<=2`` unpolluted, ``>2..<=3`` mild, ``>3..<=6`` moderate,
+    ``>6`` severe.
+    """
+    if _is_missing_number(rpi):
+        return None, None
+    if rpi <= 2:
+        return "unpolluted", 1
+    if rpi <= 3:
+        return "mild", 2
+    if rpi <= 6:
+        return "moderate", 3
+    return "severe", 4
+
+
+def normalize_ext_records(
+    records: list,
+    data_time: str,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Normalize records from the Ext_River endpoint into the shared schema.
+
+    Other-agency stations lack `River_ID`/`Station_Order`, so segment
+    generation is not attempted for them. RPI is calculated from the four
+    sub-indicator scores; conductivity is preserved for popup context only.
+    Site IDs are prefixed with ``ext:{SiteMgt_ID}:{SiteID}`` to avoid
+    collisions with official MOENV `Station_ID` values.
+    """
+    if not records:
+        return pd.DataFrame(columns=_SITE_COLUMNS), pd.DataFrame(columns=_LATEST_COLUMNS)
+
+    df = pd.DataFrame(records)
+    if "New_County_Cname" not in df.columns:
+        return pd.DataFrame(columns=_SITE_COLUMNS), pd.DataFrame(columns=_LATEST_COLUMNS)
+
+    df = df[df["New_County_Cname"].isin(TARGET_CITIES)].copy()
+    if df.empty:
+        return pd.DataFrame(columns=_SITE_COLUMNS), pd.DataFrame(columns=_LATEST_COLUMNS)
+
+    if "Coord_Type" in df.columns:
+        coord_known = df["Coord_Type"].astype(str).str.strip()
+        non_wgs84 = (coord_known != "") & (coord_known != "WGS84")
+        if non_wgs84.any():
+            logger.warning(
+                "Skipping %d Ext_River records with Coord_Type != WGS84.",
+                int(non_wgs84.sum()),
+            )
+            df = df[~non_wgs84].copy()
+        if df.empty:
+            return pd.DataFrame(columns=_SITE_COLUMNS), pd.DataFrame(columns=_LATEST_COLUMNS)
+
+    df["raw_site_id"] = df["SiteID"].map(_to_str_or_none)
+    df["site_mgt_id"] = df["SiteMgt_ID"].map(_to_str_or_none)
+    df = df[df["raw_site_id"].notna() & df["site_mgt_id"].notna()].copy()
+    if df.empty:
+        return pd.DataFrame(columns=_SITE_COLUMNS), pd.DataFrame(columns=_LATEST_COLUMNS)
+
+    df["site_id"] = (
+        EXT_SITE_ID_PREFIX
+        + ":"
+        + df["site_mgt_id"].astype(str)
+        + ":"
+        + df["raw_site_id"].astype(str)
+    )
+    df = df.drop_duplicates(subset=["site_id"], keep="last")
+
+    df["source_name"] = SOURCE_NAME
+    df["source_label"] = SOURCE_LABEL_MOENV_EXT_RIVER
+    df["rpi_method"] = RPI_METHOD_CALCULATED_FROM_ITEMS
+    df["city"] = df["New_County_Cname"]
+    df["district"] = None
+    basin_series = df["Basin_Name"].map(_to_str_or_none) if "Basin_Name" in df.columns else None
+    df["basin"] = basin_series
+    df["river"] = basin_series
+    df["river_id"] = None
+    df["station_order"] = pd.array([pd.NA] * len(df), dtype="Int64")
+    df["site_name"] = df["ChtName"].map(_to_str_or_none) if "ChtName" in df.columns else None
+    df["site_name_en"] = (
+        df["EngName"].map(_to_str_or_none) if "EngName" in df.columns else None
+    )
+    df["site_address"] = (
+        df["Unit_Cname"].map(_to_str_or_none) if "Unit_Cname" in df.columns else None
+    )
+    df["status_of_use"] = None
+    df["wq_std_grade"] = None
+    df["longitude"] = df["Gis_X"].map(_to_numeric_or_none) if "Gis_X" in df.columns else None
+    df["latitude"] = df["Gis_Y"].map(_to_numeric_or_none) if "Gis_Y" in df.columns else None
+    df["data_time"] = data_time
+
+    df["sample_month"] = df["MonthDate_Dec"].map(parse_month_date)
+
+    df["do_value"] = df["Id_204"].map(parse_indicator_value)
+    df["bod5_value"] = df["Id_206"].map(parse_indicator_value)
+    df["ss_value"] = df["Id_202"].map(parse_indicator_value)
+    df["nh3n_value"] = df["Id_209"].map(parse_indicator_value)
+    df["conductivity_value"] = df["Id_107"].map(parse_indicator_value)
+
+    rpi_results = [
+        compute_rpi_from_items(do, bod5, ss, nh3n)
+        for do, bod5, ss, nh3n in zip(
+            df["do_value"], df["bod5_value"], df["ss_value"], df["nh3n_value"]
+        )
+    ]
+    df["rpi_value"] = [r[0] for r in rpi_results]
+    df["do_score"] = [r[1]["do_score"] for r in rpi_results]
+    df["bod5_score"] = [r[1]["bod5_score"] for r in rpi_results]
+    df["ss_score"] = [r[1]["ss_score"] for r in rpi_results]
+    df["nh3n_score"] = [r[1]["nh3n_score"] for r in rpi_results]
+    risk_mapping = df["rpi_value"].map(map_rpi_to_risk_level)
+    df["risk_level"] = risk_mapping.map(lambda pair: pair[0])
+    df["risk_level_order"] = risk_mapping.map(lambda pair: pair[1]).astype("Int64")
+    df["rpi_flag"] = [
+        RPI_FLAG_COMPLETE if r[2] else RPI_FLAG_INCOMPLETE for r in rpi_results
+    ]
+    df["do_method"] = [
+        DO_METHOD_EXT_ENDPOINT if pd.notna(v) else None for v in df["do_value"]
+    ]
+
+    return df[_SITE_COLUMNS].copy(), df[_LATEST_COLUMNS].copy()
+
+
+def merge_normalized_frames(
+    frames_sites: List[pd.DataFrame],
+    frames_latest: List[pd.DataFrame],
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    sites = (
+        pd.concat(frames_sites, ignore_index=True)
+        if frames_sites
+        else pd.DataFrame(columns=_SITE_COLUMNS)
+    )
+    latest = (
+        pd.concat(frames_latest, ignore_index=True)
+        if frames_latest
+        else pd.DataFrame(columns=_LATEST_COLUMNS)
+    )
+    if not sites.empty:
+        sites = sites.drop_duplicates(subset=["site_id"], keep="first")
+    if not latest.empty:
+        latest = latest.drop_duplicates(subset=["site_id"], keep="first")
+    return sites, latest
 
 
 def fetch_wra_river_geodataframe(
@@ -428,6 +999,82 @@ def _index_river_features(
     return out
 
 
+EXT_RIVER_ID_PREFIX = "ext-river"
+
+
+def _synthesize_ext_segment_ordering(
+    latest_df: pd.DataFrame,
+    wra_gdf: Optional[gpd.GeoDataFrame],
+) -> pd.DataFrame:
+    """Derive river_id / station_order for Ext stations by WRA projection.
+
+    Ext_River rows arrive without `River_ID` / `Station_Order`, so the
+    existing segment builder skips them. For Ext rows whose ``basin``
+    matches a WRA river name (after :data:`RIVER_NAME_ALIAS`), project the
+    station onto the matched centerline; sort by ``(feature_idx, t_along)``
+    within each basin to derive a synthetic ``station_order``; and stamp
+    ``river_id = "ext-river:{basin}"`` so the basin's stations group
+    together when the segment builder iterates.
+
+    Stations whose basin does not match WRA, or whose projection distance
+    exceeds :data:`STATION_OFF_RIVER_TOLERANCE_M`, retain their NA values
+    and remain points-only.
+    """
+    if (
+        latest_df is None
+        or latest_df.empty
+        or wra_gdf is None
+        or len(wra_gdf) == 0
+        or "source_label" not in latest_df.columns
+    ):
+        return latest_df
+
+    ext_mask = (
+        (latest_df["source_label"] == SOURCE_LABEL_MOENV_EXT_RIVER)
+        & latest_df["rpi_value"].notna()
+        & latest_df["basin"].notna()
+        & latest_df["longitude"].notna()
+        & latest_df["latitude"].notna()
+    )
+    if not ext_mask.any():
+        return latest_df
+
+    basins = latest_df.loc[ext_mask, "basin"].unique().tolist()
+    river_features = _index_river_features(wra_gdf, basins)
+    if not river_features:
+        return latest_df
+
+    df = latest_df.copy()
+    if "river_id" in df.columns and df["river_id"].dtype != object:
+        df["river_id"] = df["river_id"].astype(object)
+
+    for basin_name, features in river_features.items():
+        basin_mask = ext_mask & (latest_df["basin"] == basin_name)
+        basin_indexes = latest_df.index[basin_mask].tolist()
+        if len(basin_indexes) < 2:
+            continue
+
+        projections: List[Tuple[int, _Projection]] = []
+        for idx in basin_indexes:
+            row = latest_df.loc[idx]
+            pt = Point(float(row["longitude"]), float(row["latitude"]))
+            proj = _project_to_nearest_feature(pt, features)
+            if proj is None or proj.dist_m > STATION_OFF_RIVER_TOLERANCE_M:
+                continue
+            projections.append((idx, proj))
+
+        if len(projections) < 2:
+            continue
+
+        projections.sort(key=lambda x: (x[1].feature_idx, x[1].t_along))
+        synthetic_river_id = f"{EXT_RIVER_ID_PREFIX}:{basin_name}"
+        for order, (idx, _) in enumerate(projections, 1):
+            df.at[idx, "river_id"] = synthetic_river_id
+            df.at[idx, "station_order"] = order
+
+    return df
+
+
 def build_river_segments(
     latest_df: pd.DataFrame,
     wra_gdf: Optional[gpd.GeoDataFrame] = None,
@@ -436,6 +1083,8 @@ def build_river_segments(
     empty = pd.DataFrame(columns=_SEGMENT_COLUMNS)
     if latest_df is None or latest_df.empty:
         return empty
+
+    latest_df = _synthesize_ext_segment_ordering(latest_df, wra_gdf)
 
     df = latest_df.dropna(
         subset=["river_id", "station_order", "longitude", "latitude", "rpi_value"]
@@ -528,6 +1177,18 @@ _SITE_GEOJSON_PROPS = [
     "risk_level",
     "rpi_flag",
     "source_name",
+    "source_label",
+    "rpi_method",
+    "do_value",
+    "bod5_value",
+    "ss_value",
+    "nh3n_value",
+    "conductivity_value",
+    "do_score",
+    "bod5_score",
+    "ss_score",
+    "nh3n_score",
+    "do_method",
     "data_time",
 ]
 
@@ -563,24 +1224,31 @@ def export_geojson_layers(
 
     segs_taipei_path = os.path.join(out_dir, "env_river_segments_taipei.geojson")
     segs_metro_path = os.path.join(out_dir, "env_river_segments_metrotaipei.geojson")
+
     if segments_gdf is None or segments_gdf.empty:
-        _write_empty_collection(os.path.join(out_dir, "env_river_sites_taipei.geojson"))
-        _write_empty_collection(
-            os.path.join(out_dir, "env_river_sites_metrotaipei.geojson")
-        )
-        _write_empty_collection(segs_taipei_path)
-        _write_empty_collection(segs_metro_path)
-        return
+        segs_taipei = None
+        segs_metro = None
+    else:
+        segs_metro = segments_gdf[segments_gdf["wkb_geometry"].notna()].copy()
+        segs_metro["sample_month"] = segs_metro["sample_month"].map(_iso_or_none)
+        segs_metro = _segments_connected_to_sites(segs_metro, sites)
+        segs_taipei = segs_metro[
+            (segs_metro["upstream_city"] == taipei)
+            & (segs_metro["downstream_city"] == taipei)
+        ]
 
-    segs = segments_gdf[segments_gdf["wkb_geometry"].notna()].copy()
-    segs["sample_month"] = segs["sample_month"].map(_iso_or_none)
-    segs = _segments_connected_to_sites(segs, sites)
+    if segs_taipei is None or segs_taipei.empty:
+        taipei_segment_site_ids = set()
+    else:
+        taipei_segment_site_ids = _connected_site_ids_from_segments(segs_taipei, sites)
+    if segs_metro is None or segs_metro.empty:
+        metro_segment_site_ids = set()
+    else:
+        metro_segment_site_ids = _connected_site_ids_from_segments(segs_metro, sites)
 
-    segs_taipei = segs[
-        (segs["upstream_city"] == taipei) & (segs["downstream_city"] == taipei)
-    ]
-    taipei_site_ids = _connected_site_ids_from_segments(segs_taipei, sites)
-    metro_site_ids = _connected_site_ids_from_segments(segs, sites)
+    extra_site_ids = _ext_source_visible_site_ids(sites)
+    taipei_site_ids = taipei_segment_site_ids | extra_site_ids
+    metro_site_ids = metro_segment_site_ids | extra_site_ids
 
     _write_geojson(
         sites[(sites["city"] == taipei) & (sites["site_id"].isin(taipei_site_ids))],
@@ -592,8 +1260,24 @@ def export_geojson_layers(
         _SITE_GEOJSON_PROPS,
         os.path.join(out_dir, "env_river_sites_metrotaipei.geojson"),
     )
-    _write_geojson(segs_taipei, _SEGMENT_GEOJSON_PROPS, segs_taipei_path)
-    _write_geojson(segs, _SEGMENT_GEOJSON_PROPS, segs_metro_path)
+
+    if segs_taipei is None:
+        _write_empty_collection(segs_taipei_path)
+    else:
+        _write_geojson(segs_taipei, _SEGMENT_GEOJSON_PROPS, segs_taipei_path)
+    if segs_metro is None:
+        _write_empty_collection(segs_metro_path)
+    else:
+        _write_geojson(segs_metro, _SEGMENT_GEOJSON_PROPS, segs_metro_path)
+
+
+def _ext_source_visible_site_ids(sites: gpd.GeoDataFrame) -> set:
+    if sites is None or sites.empty or "source_label" not in sites.columns:
+        return set()
+    mask = sites["source_label"] == SOURCE_LABEL_MOENV_EXT_RIVER
+    if "rpi_flag" in sites.columns:
+        mask &= sites["rpi_flag"] == RPI_FLAG_COMPLETE
+    return set(sites.loc[mask, "site_id"].astype(str))
 
 
 def _site_ids_from_segments(segs: gpd.GeoDataFrame) -> set:

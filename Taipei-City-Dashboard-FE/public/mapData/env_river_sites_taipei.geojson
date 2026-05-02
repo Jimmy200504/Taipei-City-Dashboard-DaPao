@@ -1,212 +1,31 @@
 {
-	"type": "FeatureCollection",
-	"name": "env_river_sites_taipei",
-	"crs": {
-		"type": "name",
-		"properties": {
-			"name": "urn:ogc:def:crs:OGC:1.3:CRS84"
-		}
-	},
-	"features": [
-		{
-			"type": "Feature",
-			"properties": {
-				"site_id": "1001",
-				"site_name": "忠孝大橋",
-				"city": "臺北市",
-				"district": "中正區",
-				"basin": "淡水河流域",
-				"river": "淡水河本流",
-				"wq_std_grade": "丁",
-				"sample_month": "2026-03-01",
-				"rpi_value": 6.5,
-				"risk_level": "severe",
-				"rpi_flag": "complete",
-				"source_name": "環境部",
-				"data_time": "2026-05-02 22:46:52+08:00"
-			},
-			"geometry": {
-				"type": "Point",
-				"coordinates": [
-					121.500209,
-					25.051144
-				]
-			}
-		},
-		{
-			"type": "Feature",
-			"properties": {
-				"site_id": "1002",
-				"site_name": "重陽大橋",
-				"city": "臺北市",
-				"district": "士林區",
-				"basin": "淡水河流域",
-				"river": "淡水河本流",
-				"wq_std_grade": "丁",
-				"sample_month": "2026-03-01",
-				"rpi_value": 5.75,
-				"risk_level": "moderate",
-				"rpi_flag": "complete",
-				"source_name": "環境部",
-				"data_time": "2026-05-02 22:46:52+08:00"
-			},
-			"geometry": {
-				"type": "Point",
-				"coordinates": [
-					121.5027969,
-					25.084174
-				]
-			}
-		},
-		{
-			"type": "Feature",
-			"properties": {
-				"site_id": "1010",
-				"site_name": "民權大橋",
-				"city": "臺北市",
-				"district": "松山區",
-				"basin": "淡水河流域",
-				"river": "基隆河",
-				"wq_std_grade": "丁",
-				"sample_month": "2026-03-01",
-				"rpi_value": 5.0,
-				"risk_level": "moderate",
-				"rpi_flag": "complete",
-				"source_name": "環境部",
-				"data_time": "2026-05-02 22:46:52+08:00"
-			},
-			"geometry": {
-				"type": "Point",
-				"coordinates": [
-					121.5695161,
-					25.0634669
-				]
-			}
-		},
-		{
-			"type": "Feature",
-			"properties": {
-				"site_id": "1011",
-				"site_name": "大直橋",
-				"city": "臺北市",
-				"district": "中山區",
-				"basin": "淡水河流域",
-				"river": "基隆河",
-				"wq_std_grade": "丁",
-				"sample_month": "2026-03-01",
-				"rpi_value": 3.5,
-				"risk_level": "moderate",
-				"rpi_flag": "complete",
-				"source_name": "環境部",
-				"data_time": "2026-05-02 22:46:52+08:00"
-			},
-			"geometry": {
-				"type": "Point",
-				"coordinates": [
-					121.5444539,
-					25.0764581
-				]
-			}
-		},
-		{
-			"type": "Feature",
-			"properties": {
-				"site_id": "1012",
-				"site_name": "百齡橋",
-				"city": "臺北市",
-				"district": "士林區",
-				"basin": "淡水河流域",
-				"river": "基隆河",
-				"wq_std_grade": "丁",
-				"sample_month": "2026-03-01",
-				"rpi_value": 2.75,
-				"risk_level": "mild",
-				"rpi_flag": "complete",
-				"source_name": "環境部",
-				"data_time": "2026-05-02 22:46:52+08:00"
-			},
-			"geometry": {
-				"type": "Point",
-				"coordinates": [
-					121.5137258,
-					25.088435
-				]
-			}
-		},
-		{
-			"type": "Feature",
-			"properties": {
-				"site_id": "1269",
-				"site_name": "南湖大橋",
-				"city": "臺北市",
-				"district": "南港區",
-				"basin": "淡水河流域",
-				"river": "基隆河",
-				"wq_std_grade": "丁",
-				"sample_month": "2026-03-01",
-				"rpi_value": 4.0,
-				"risk_level": "moderate",
-				"rpi_flag": "complete",
-				"source_name": "環境部",
-				"data_time": "2026-05-02 22:46:52+08:00"
-			},
-			"geometry": {
-				"type": "Point",
-				"coordinates": [
-					121.6120211,
-					25.063235
-				]
-			}
-		},
-		{
-			"type": "Feature",
-			"properties": {
-				"site_id": "1270",
-				"site_name": "成美橋",
-				"city": "臺北市",
-				"district": "內湖區",
-				"basin": "淡水河流域",
-				"river": "基隆河",
-				"wq_std_grade": "丁",
-				"sample_month": "2026-03-01",
-				"rpi_value": 5.75,
-				"risk_level": "moderate",
-				"rpi_flag": "complete",
-				"source_name": "環境部",
-				"data_time": "2026-05-02 22:46:52+08:00"
-			},
-			"geometry": {
-				"type": "Point",
-				"coordinates": [
-					121.583295,
-					25.0536689
-				]
-			}
-		},
-		{
-			"type": "Feature",
-			"properties": {
-				"site_id": "1280",
-				"site_name": "中山橋",
-				"city": "臺北市",
-				"district": "士林區",
-				"basin": "淡水河流域",
-				"river": "基隆河",
-				"wq_std_grade": "丁",
-				"sample_month": "2026-03-01",
-				"rpi_value": 3.5,
-				"risk_level": "moderate",
-				"rpi_flag": "complete",
-				"source_name": "環境部",
-				"data_time": "2026-05-02 22:46:52+08:00"
-			},
-			"geometry": {
-				"type": "Point",
-				"coordinates": [
-					121.5251139,
-					25.0738869
-				]
-			}
-		}
-	]
+"type": "FeatureCollection",
+"name": "env_river_sites_taipei",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "site_id": "1001", "site_name": "忠孝大橋", "city": "臺北市", "district": "中正區", "basin": "淡水河流域", "river": "淡水河本流", "wq_std_grade": "丁", "sample_month": "2026-03-01", "rpi_value": 6.5, "risk_level": "severe", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_river", "rpi_method": "source_wq_index", "do_value": null, "bod5_value": null, "ss_value": null, "nh3n_value": null, "conductivity_value": null, "do_score": null, "bod5_score": null, "ss_score": null, "nh3n_score": null, "do_method": null, "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.500209, 25.051144 ] } },
+{ "type": "Feature", "properties": { "site_id": "1002", "site_name": "重陽大橋", "city": "臺北市", "district": "士林區", "basin": "淡水河流域", "river": "淡水河本流", "wq_std_grade": "丁", "sample_month": "2026-03-01", "rpi_value": 5.75, "risk_level": "moderate", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_river", "rpi_method": "source_wq_index", "do_value": null, "bod5_value": null, "ss_value": null, "nh3n_value": null, "conductivity_value": null, "do_score": null, "bod5_score": null, "ss_score": null, "nh3n_score": null, "do_method": null, "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.5027969, 25.084174 ] } },
+{ "type": "Feature", "properties": { "site_id": "1010", "site_name": "民權大橋", "city": "臺北市", "district": "松山區", "basin": "淡水河流域", "river": "基隆河", "wq_std_grade": "丁", "sample_month": "2026-03-01", "rpi_value": 5.0, "risk_level": "moderate", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_river", "rpi_method": "source_wq_index", "do_value": null, "bod5_value": null, "ss_value": null, "nh3n_value": null, "conductivity_value": null, "do_score": null, "bod5_score": null, "ss_score": null, "nh3n_score": null, "do_method": null, "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.5695161, 25.0634669 ] } },
+{ "type": "Feature", "properties": { "site_id": "1011", "site_name": "大直橋", "city": "臺北市", "district": "中山區", "basin": "淡水河流域", "river": "基隆河", "wq_std_grade": "丁", "sample_month": "2026-03-01", "rpi_value": 3.5, "risk_level": "moderate", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_river", "rpi_method": "source_wq_index", "do_value": null, "bod5_value": null, "ss_value": null, "nh3n_value": null, "conductivity_value": null, "do_score": null, "bod5_score": null, "ss_score": null, "nh3n_score": null, "do_method": null, "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.5444539, 25.0764581 ] } },
+{ "type": "Feature", "properties": { "site_id": "1012", "site_name": "百齡橋", "city": "臺北市", "district": "士林區", "basin": "淡水河流域", "river": "基隆河", "wq_std_grade": "丁", "sample_month": "2026-03-01", "rpi_value": 2.75, "risk_level": "mild", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_river", "rpi_method": "source_wq_index", "do_value": null, "bod5_value": null, "ss_value": null, "nh3n_value": null, "conductivity_value": null, "do_score": null, "bod5_score": null, "ss_score": null, "nh3n_score": null, "do_method": null, "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.5137258, 25.088435 ] } },
+{ "type": "Feature", "properties": { "site_id": "1269", "site_name": "南湖大橋", "city": "臺北市", "district": "南港區", "basin": "淡水河流域", "river": "基隆河", "wq_std_grade": "丁", "sample_month": "2026-03-01", "rpi_value": 4.0, "risk_level": "moderate", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_river", "rpi_method": "source_wq_index", "do_value": null, "bod5_value": null, "ss_value": null, "nh3n_value": null, "conductivity_value": null, "do_score": null, "bod5_score": null, "ss_score": null, "nh3n_score": null, "do_method": null, "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.6120211, 25.063235 ] } },
+{ "type": "Feature", "properties": { "site_id": "1270", "site_name": "成美橋", "city": "臺北市", "district": "內湖區", "basin": "淡水河流域", "river": "基隆河", "wq_std_grade": "丁", "sample_month": "2026-03-01", "rpi_value": 5.75, "risk_level": "moderate", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_river", "rpi_method": "source_wq_index", "do_value": null, "bod5_value": null, "ss_value": null, "nh3n_value": null, "conductivity_value": null, "do_score": null, "bod5_score": null, "ss_score": null, "nh3n_score": null, "do_method": null, "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.583295, 25.0536689 ] } },
+{ "type": "Feature", "properties": { "site_id": "1280", "site_name": "中山橋", "city": "臺北市", "district": "士林區", "basin": "淡水河流域", "river": "基隆河", "wq_std_grade": "丁", "sample_month": "2026-03-01", "rpi_value": 3.5, "risk_level": "moderate", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_river", "rpi_method": "source_wq_index", "do_value": null, "bod5_value": null, "ss_value": null, "nh3n_value": null, "conductivity_value": null, "do_score": null, "bod5_score": null, "ss_score": null, "nh3n_score": null, "do_method": null, "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.5251139, 25.0738869 ] } },
+{ "type": "Feature", "properties": { "site_id": "ext:3:2054", "site_name": "臺北橋", "city": "臺北市", "district": null, "basin": "淡水河", "river": "淡水河", "wq_std_grade": null, "sample_month": "2026-03-01", "rpi_value": 5.5, "risk_level": "moderate", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_ext_river", "rpi_method": "calculated_from_items", "do_value": 3.6, "bod5_value": 3.4, "ss_value": 49.2, "nh3n_value": 3.5, "conductivity_value": 516.0, "do_score": 6.0, "bod5_score": 3.0, "ss_score": 3.0, "nh3n_score": 10.0, "do_method": "ext_endpoint", "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 120.506722222222223, 25.065008333333335 ] } },
+{ "type": "Feature", "properties": { "site_id": "ext:3:2057", "site_name": "磺溪橋", "city": "臺北市", "district": null, "basin": "磺溪", "river": "磺溪", "wq_std_grade": null, "sample_month": "2026-03-01", "rpi_value": 1.0, "risk_level": "unpolluted", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_ext_river", "rpi_method": "calculated_from_items", "do_value": 9.9, "bod5_value": 0.2, "ss_value": 9.1, "nh3n_value": 0.0, "conductivity_value": 508.0, "do_score": 1.0, "bod5_score": 1.0, "ss_score": 1.0, "nh3n_score": 1.0, "do_method": "ext_endpoint", "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.638888888888886, 25.15 ] } },
+{ "type": "Feature", "properties": { "site_id": "ext:3:2058", "site_name": "新貴子坑", "city": "臺北市", "district": null, "basin": "貴子坑溪", "river": "貴子坑溪", "wq_std_grade": null, "sample_month": "2026-03-01", "rpi_value": 1.0, "risk_level": "unpolluted", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_ext_river", "rpi_method": "calculated_from_items", "do_value": 12.0, "bod5_value": 0.2, "ss_value": 5.8, "nh3n_value": 0.08, "conductivity_value": 274.0, "do_score": 1.0, "bod5_score": 1.0, "ss_score": 1.0, "nh3n_score": 1.0, "do_method": "ext_endpoint", "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.492919444444439, 25.145969444444443 ] } },
+{ "type": "Feature", "properties": { "site_id": "ext:3:2481", "site_name": "陽明山", "city": "臺北市", "district": null, "basin": "磺溪", "river": "磺溪", "wq_std_grade": null, "sample_month": "2026-03-01", "rpi_value": 1.0, "risk_level": "unpolluted", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_ext_river", "rpi_method": "calculated_from_items", "do_value": 11.1, "bod5_value": 0.7, "ss_value": 1.9, "nh3n_value": 0.0, "conductivity_value": 230.0, "do_score": 1.0, "bod5_score": 1.0, "ss_score": 1.0, "nh3n_score": 1.0, "do_method": "ext_endpoint", "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.532980555555554, 25.16065 ] } },
+{ "type": "Feature", "properties": { "site_id": "ext:3:2482", "site_name": "大豐停車場", "city": "臺北市", "district": null, "basin": "磺港溪", "river": "磺港溪", "wq_std_grade": null, "sample_month": "2026-03-01", "rpi_value": 3.25, "risk_level": "moderate", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_ext_river", "rpi_method": "calculated_from_items", "do_value": 8.4, "bod5_value": 2.5, "ss_value": 4.9, "nh3n_value": 3.06, "conductivity_value": 2560.0, "do_score": 1.0, "bod5_score": 1.0, "ss_score": 1.0, "nh3n_score": 10.0, "do_method": "ext_endpoint", "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.504511111111114, 25.131144444444445 ] } },
+{ "type": "Feature", "properties": { "site_id": "ext:3:145", "site_name": "永福橋", "city": "臺北市", "district": null, "basin": "新店溪", "river": "新店溪", "wq_std_grade": null, "sample_month": "2026-03-01", "rpi_value": 2.25, "risk_level": "mild", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_ext_river", "rpi_method": "calculated_from_items", "do_value": 7.4, "bod5_value": 1.3, "ss_value": 4.7, "nh3n_value": 1.01, "conductivity_value": 186.0, "do_score": 1.0, "bod5_score": 1.0, "ss_score": 1.0, "nh3n_score": 6.0, "do_method": "ext_endpoint", "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.528383333333338, 25.011983333333333 ] } },
+{ "type": "Feature", "properties": { "site_id": "ext:3:146", "site_name": "萬福橋", "city": "臺北市", "district": null, "basin": "景美溪", "river": "景美溪", "wq_std_grade": null, "sample_month": "2026-03-01", "rpi_value": 1.0, "risk_level": "unpolluted", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_ext_river", "rpi_method": "calculated_from_items", "do_value": 11.6, "bod5_value": 1.5, "ss_value": 5.2, "nh3n_value": 0.25, "conductivity_value": 132.0, "do_score": 1.0, "bod5_score": 1.0, "ss_score": 1.0, "nh3n_score": 1.0, "do_method": "ext_endpoint", "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.5935, 25.001866666666668 ] } },
+{ "type": "Feature", "properties": { "site_id": "ext:3:147", "site_name": "恆光橋", "city": "臺北市", "district": null, "basin": "景美溪", "river": "景美溪", "wq_std_grade": null, "sample_month": "2026-03-01", "rpi_value": 1.0, "risk_level": "unpolluted", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_ext_river", "rpi_method": "calculated_from_items", "do_value": 11.0, "bod5_value": 1.6, "ss_value": 5.7, "nh3n_value": 0.25, "conductivity_value": 140.0, "do_score": 1.0, "bod5_score": 1.0, "ss_score": 1.0, "nh3n_score": 1.0, "do_method": "ext_endpoint", "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.567733333333337, 24.980333333333331 ] } },
+{ "type": "Feature", "properties": { "site_id": "ext:3:148", "site_name": "景美橋", "city": "臺北市", "district": null, "basin": "景美溪", "river": "景美溪", "wq_std_grade": null, "sample_month": "2026-03-01", "rpi_value": 2.0, "risk_level": "unpolluted", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_ext_river", "rpi_method": "calculated_from_items", "do_value": 10.3, "bod5_value": 3.9, "ss_value": 5.2, "nh3n_value": 0.55, "conductivity_value": 150.0, "do_score": 1.0, "bod5_score": 3.0, "ss_score": 1.0, "nh3n_score": 3.0, "do_method": "ext_endpoint", "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.583333333333329, 25.068333333333335 ] } },
+{ "type": "Feature", "properties": { "site_id": "ext:3:150", "site_name": "成功橋", "city": "臺北市", "district": null, "basin": "基隆河", "river": "基隆河", "wq_std_grade": null, "sample_month": "2026-03-01", "rpi_value": 2.0, "risk_level": "unpolluted", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_ext_river", "rpi_method": "calculated_from_items", "do_value": 9.3, "bod5_value": 2.5, "ss_value": 45.4, "nh3n_value": 0.53, "conductivity_value": 170.0, "do_score": 1.0, "bod5_score": 1.0, "ss_score": 3.0, "nh3n_score": 3.0, "do_method": "ext_endpoint", "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.591866666666661, 25.0591 ] } },
+{ "type": "Feature", "properties": { "site_id": "ext:3:151", "site_name": "大直橋", "city": "臺北市", "district": null, "basin": "基隆河", "river": "基隆河", "wq_std_grade": null, "sample_month": "2026-03-01", "rpi_value": 1.0, "risk_level": "unpolluted", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_ext_river", "rpi_method": "calculated_from_items", "do_value": 8.1, "bod5_value": 2.6, "ss_value": 14.2, "nh3n_value": 0.5, "conductivity_value": 177.0, "do_score": 1.0, "bod5_score": 1.0, "ss_score": 1.0, "nh3n_score": 1.0, "do_method": "ext_endpoint", "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.544302777777773, 25.076327777777777 ] } },
+{ "type": "Feature", "properties": { "site_id": "ext:3:152", "site_name": "承德橋", "city": "臺北市", "district": null, "basin": "基隆河", "river": "基隆河", "wq_std_grade": null, "sample_month": "2026-03-01", "rpi_value": 1.0, "risk_level": "unpolluted", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_ext_river", "rpi_method": "calculated_from_items", "do_value": 8.3, "bod5_value": 2.3, "ss_value": 11.0, "nh3n_value": 0.19, "conductivity_value": 178.0, "do_score": 1.0, "bod5_score": 1.0, "ss_score": 1.0, "nh3n_score": 1.0, "do_method": "ext_endpoint", "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.52105, 25.077033333333333 ] } },
+{ "type": "Feature", "properties": { "site_id": "ext:3:153", "site_name": "雙溪取水口", "city": "臺北市", "district": null, "basin": "雙溪", "river": "雙溪", "wq_std_grade": null, "sample_month": "2026-03-01", "rpi_value": 1.0, "risk_level": "unpolluted", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_ext_river", "rpi_method": "calculated_from_items", "do_value": 12.2, "bod5_value": 0.3, "ss_value": 3.1, "nh3n_value": 0.0, "conductivity_value": 119.0, "do_score": 1.0, "bod5_score": 1.0, "ss_score": 1.0, "nh3n_score": 1.0, "do_method": "ext_endpoint", "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.570116666666664, 25.11375 ] } },
+{ "type": "Feature", "properties": { "site_id": "ext:3:154", "site_name": "青礜溪", "city": "臺北市", "district": null, "basin": "雙溪", "river": "雙溪", "wq_std_grade": null, "sample_month": "2026-03-01", "rpi_value": 1.0, "risk_level": "unpolluted", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_ext_river", "rpi_method": "calculated_from_items", "do_value": 12.0, "bod5_value": 0.2, "ss_value": 2.8, "nh3n_value": 0.0, "conductivity_value": 145.0, "do_score": 1.0, "bod5_score": 1.0, "ss_score": 1.0, "nh3n_score": 1.0, "do_method": "ext_endpoint", "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.5661, 25.113433333333333 ] } },
+{ "type": "Feature", "properties": { "site_id": "ext:3:155", "site_name": "復興橋", "city": "臺北市", "district": null, "basin": "雙溪", "river": "雙溪", "wq_std_grade": null, "sample_month": "2026-03-01", "rpi_value": 1.0, "risk_level": "unpolluted", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_ext_river", "rpi_method": "calculated_from_items", "do_value": 12.3, "bod5_value": 0.4, "ss_value": 4.6, "nh3n_value": 0.0, "conductivity_value": 156.0, "do_score": 1.0, "bod5_score": 1.0, "ss_score": 1.0, "nh3n_score": 1.0, "do_method": "ext_endpoint", "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.5365, 25.100483333333333 ] } },
+{ "type": "Feature", "properties": { "site_id": "ext:3:160", "site_name": "山豬窟溪", "city": "臺北市", "district": null, "basin": "山豬窟溪", "river": "山豬窟溪", "wq_std_grade": null, "sample_month": "2026-03-01", "rpi_value": 1.0, "risk_level": "unpolluted", "rpi_flag": "complete", "source_name": "環境部", "source_label": "moenv_ext_river", "rpi_method": "calculated_from_items", "do_value": 11.5, "bod5_value": 3.0, "ss_value": 2.9, "nh3n_value": 0.13, "conductivity_value": 518.0, "do_score": 1.0, "bod5_score": 1.0, "ss_score": 1.0, "nh3n_score": 1.0, "do_method": "ext_endpoint", "data_time": "2026-05-03 03:17:36+08:00" }, "geometry": { "type": "Point", "coordinates": [ 121.62459166666666, 25.033333333333331 ] } }
+]
 }

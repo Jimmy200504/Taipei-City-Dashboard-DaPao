@@ -36,6 +36,7 @@ DROP TABLE IF EXISTS env_river_monitoring_sites;
 
 CREATE TABLE env_river_monitoring_sites (
     source_name text NOT NULL,
+    source_label text,
     city text,
     district text,
     basin text,
@@ -61,6 +62,8 @@ CREATE INDEX env_river_monitoring_sites_city_idx
 
 CREATE TABLE env_river_site_rpi_latest (
     source_name text NOT NULL,
+    source_label text,
+    rpi_method text,
     city text,
     district text,
     basin text,
@@ -73,6 +76,16 @@ CREATE TABLE env_river_site_rpi_latest (
     risk_level text,
     risk_level_order integer,
     rpi_flag text,
+    do_value numeric,
+    bod5_value numeric,
+    ss_value numeric,
+    nh3n_value numeric,
+    conductivity_value numeric,
+    do_score numeric,
+    bod5_score numeric,
+    ss_score numeric,
+    nh3n_score numeric,
+    do_method text,
     data_time timestamptz,
     wkb_geometry geometry(Point, 4326),
     CONSTRAINT env_river_site_rpi_latest_pk PRIMARY KEY (site_id)

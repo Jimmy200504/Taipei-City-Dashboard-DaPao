@@ -10,6 +10,8 @@ import pandas as pd
 from shapely.geometry import LineString, Point
 
 from proj_city_dashboard.env_river_water_quality.river_water_quality_lib import (
+    EXT_RIVER_ID_PREFIX,
+    SOURCE_LABEL_MOENV_EXT_RIVER,
     TARGET_CITIES,
 )
 
@@ -18,6 +20,99 @@ Coord = Tuple[float, float]
 DEFAULT_MAX_STATION_DISTANCE_M = 1500.0
 DEFAULT_NODE_PRECISION = 7
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+
+
+def synthesize_ext_station_ordering(
+    latest_df: pd.DataFrame,
+    waterways_gdf: gpd.GeoDataFrame,
+    name_col: str = "name",
+    max_station_distance_m: float = DEFAULT_MAX_STATION_DISTANCE_M,
+) -> pd.DataFrame:
+    """Stamp synthetic ``river_id``/``station_order`` on Ext-source rows.
+
+    Ext stations have no upstream-provided ``River_ID`` or ``Station_Order``,
+    so ``generate_route_features`` would skip them. For each Ext row whose
+    ``basin`` matches a waterway feature ``name`` in ``waterways_gdf``, this
+    helper projects the station onto the nearest matching feature, sorts by
+    ``(feature_idx, t_along)`` per basin to derive an order, and stamps
+    ``river_id = "ext-river:{basin}"``. Stations whose basin has no
+    matching waterway, or whose projection distance exceeds
+    ``max_station_distance_m``, retain their NA values.
+    """
+    if (
+        latest_df is None
+        or latest_df.empty
+        or waterways_gdf is None
+        or waterways_gdf.empty
+        or "source_label" not in latest_df.columns
+    ):
+        return latest_df
+
+    ext_mask = (
+        (latest_df["source_label"] == SOURCE_LABEL_MOENV_EXT_RIVER)
+        & latest_df["rpi_value"].notna()
+        & latest_df["basin"].notna()
+        & latest_df["longitude"].notna()
+        & latest_df["latitude"].notna()
+    )
+    if not ext_mask.any():
+        return latest_df
+
+    df = latest_df.copy()
+    if "river_id" in df.columns and df["river_id"].dtype != object:
+        df["river_id"] = df["river_id"].astype(object)
+
+    basins = sorted(set(latest_df.loc[ext_mask, "basin"].dropna()))
+    waterways = waterways_gdf
+    if waterways.crs is not None and str(waterways.crs).upper() != "EPSG:4326":
+        waterways = waterways.to_crs("EPSG:4326")
+
+    for basin_name in basins:
+        matching = waterways[waterways[name_col] == basin_name]
+        if matching.empty:
+            continue
+        features = [
+            geom
+            for geom in matching.geometry
+            if geom is not None and not geom.is_empty and geom.geom_type == "LineString"
+        ]
+        if not features:
+            continue
+
+        basin_mask = ext_mask & (latest_df["basin"] == basin_name)
+        basin_indexes = latest_df.index[basin_mask].tolist()
+        if len(basin_indexes) < 2:
+            continue
+
+        projections = []
+        for idx in basin_indexes:
+            row = latest_df.loc[idx]
+            pt = Point(float(row["longitude"]), float(row["latitude"]))
+            best_d = math.inf
+            best_fi = 0
+            best_t = 0.0
+            for fi, feat in enumerate(features):
+                t = feat.project(pt)
+                near = feat.interpolate(t)
+                d = _haversine_meters(
+                    (pt.x, pt.y), (near.x, near.y)
+                )
+                if d < best_d:
+                    best_d, best_fi, best_t = d, fi, t
+            if best_d > max_station_distance_m:
+                continue
+            projections.append((idx, best_fi, best_t))
+
+        if len(projections) < 2:
+            continue
+
+        projections.sort(key=lambda x: (x[1], x[2]))
+        synthetic_river_id = f"{EXT_RIVER_ID_PREFIX}:{basin_name}"
+        for order, (idx, _, _) in enumerate(projections, 1):
+            df.at[idx, "river_id"] = synthetic_river_id
+            df.at[idx, "station_order"] = order
+
+    return df
 
 
 def generate_route_features(

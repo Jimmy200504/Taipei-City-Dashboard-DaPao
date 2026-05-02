@@ -13,7 +13,13 @@ import http from "../../router/axios";
 const chatStore = useChatStore();
 const contentStore = useContentStore();
 const authStore = useAuthStore();
-const { addChatData, addQueryData, addAiChatData, saveChatLog } = chatStore;
+const {
+	addChatData,
+	addQueryData,
+	addAiChatData,
+	clearAiChatData,
+	saveChatLog,
+} = chatStore;
 const { createDashboard } = contentStore;
 const { recommendChatData, aiChatData, isAiLoading } = storeToRefs(chatStore);
 const { editDashboard } = storeToRefs(contentStore);
@@ -36,6 +42,7 @@ const activeChatData = computed(() =>
 const isInputDisabled = computed(
 	() => chatMode.value === chatModeAi && isAiLoading.value
 );
+const isAiMode = computed(() => chatMode.value === chatModeAi);
 
 const qaBtnHandler = async (text, relations) => {
 	if (text === "建立儀表板") {
@@ -239,6 +246,15 @@ watch(
         @click="chatMode = mode.value"
       >
         {{ mode.label }}
+      </button>
+      <button
+        v-if="isAiMode"
+        class="clear-ai-chat"
+        type="button"
+        :disabled="isAiLoading"
+        @click="clearAiChatData"
+      >
+        清空
       </button>
     </div>
     <div class="input-area">
@@ -536,6 +552,16 @@ $radius-20: 20px;
 				background: $white;
 				color: $bg-dark;
 				font-weight: 700;
+			}
+
+			&.clear-ai-chat {
+				flex: 0 0 auto;
+				padding: 0 0.75rem;
+			}
+
+			&:disabled {
+				cursor: not-allowed;
+				opacity: 0.5;
 			}
 		}
 	}

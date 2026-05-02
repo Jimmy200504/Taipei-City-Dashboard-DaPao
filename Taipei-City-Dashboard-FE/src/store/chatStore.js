@@ -100,6 +100,10 @@ export const useChatStore = defineStore("chat", () => {
 		appendMessage(aiChatData, newChatData);
 	};
 
+	const clearAiChatData = () => {
+		aiChatData.value = [...defaultAiChatData];
+	};
+
 	const addChatData = (newChatData) => {
 		appendRecommendChatData(newChatData);
 	};
@@ -237,6 +241,7 @@ export const useChatStore = defineStore("chat", () => {
 		addChatData,
 		addQueryData,
 		addAiChatData,
+		clearAiChatData,
 		saveChatLog,
 	};
 });

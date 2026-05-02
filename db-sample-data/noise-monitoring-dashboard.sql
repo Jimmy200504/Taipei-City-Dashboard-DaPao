@@ -190,8 +190,8 @@ INSERT INTO public.query_charts (
  'percent',
  'SELECT
   noise_category,
-  district    AS x_axis,
-  exceed_rate AS data
+  district                             AS x_axis,
+  ROUND(exceed_rate * 100)::int        AS data
 FROM env_noise_district_summary_tpe
 WHERE year = (SELECT MAX(year) FROM env_noise_district_summary_tpe)
 ORDER BY exceed_rate DESC, noise_category',
@@ -211,8 +211,8 @@ ORDER BY exceed_rate DESC, noise_category',
  'percent',
  'SELECT
   noise_category,
-  district    AS x_axis,
-  exceed_rate AS data
+  district                             AS x_axis,
+  ROUND(exceed_rate * 100)::int        AS data
 FROM (
   SELECT noise_category, district, exceed_rate, year
   FROM env_noise_district_summary_tpe

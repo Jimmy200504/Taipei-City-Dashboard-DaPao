@@ -1,0 +1,43 @@
+{
+  "dag_infos": {
+    "dag_id": "ev_charging",
+    "start_date": "2026-05-03",
+    "schedule_interval": "0 4 * * *",
+    "catchup": false,
+    "tags": [
+      "ev_charging",
+      "TDX",
+      "臺北市",
+      "新北市",
+      "電動汽車充電站"
+    ],
+    "description": "EV charging stations, points, and connectors for Taipei and New Taipei from TDX CityEVCharging API.",
+    "default_args": {
+      "owner": "airflow",
+      "email": ["DEFAULT_EMAIL_LIST"],
+      "email_on_retry": false,
+      "email_on_failure": true,
+      "retries": 1,
+      "retry_delay": 60
+    },
+    "ready_data_db": "postgres_default",
+    "ready_data_default_table": "env_ev_charging_stations",
+    "ready_data_history_table": "",
+    "raw_data_db": "postgres_default",
+    "raw_data_table": "",
+    "load_behavior": "replace"
+  },
+  "data_infos": {
+    "name_cn": "雙北電動汽車充電站分布",
+    "airflow_update_freq": "04:00 every day",
+    "source": "https://tdx.transportdata.tw/api/basic/v1/EV/Station/City/Taipei?$format=JSON",
+    "source_type": "TDX API",
+    "source_dept": "交通部 TDX CityEVCharging",
+    "gis_format": "Point",
+    "output_coordinate": "EPSG:4326",
+    "is_geometry": 1,
+    "dataset_description": "臺北市與新北市電動汽車充電站、充電樁、充電槍資料，含行政區聚合統計與功率級距比例。",
+    "etl_description": "fetch TDX Station/ChargingPoint/Connector for Taipei+NewTaipei, join spatial info, classify power buckets, aggregate by district and city_scope",
+    "sensitivity": "public"
+  }
+}

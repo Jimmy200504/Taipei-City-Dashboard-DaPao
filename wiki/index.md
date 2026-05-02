@@ -14,7 +14,7 @@ Official front-end documentation for Taipei City Dashboard, covering platform st
 | [Authentication, Admin, and Dashboard Operations](taipei-city-dashboard/auth-admin-and-dashboard-operations.md) | Documents authentication modes, permissions, dashboard editing actions, and admin management pages. | 2026-04-24 |
 | [Static Application Conversion](taipei-city-dashboard/static-application-conversion.md) | Explains how to remove backend-dependent behavior and serve static dashboard data from `/public`. | 2026-04-24 |
 | [Hackathon Rules and Delivery Requirements](taipei-city-dashboard/hackathon-rules-and-delivery-requirements.md) | Summarizes 2026 hackathon themes, component requirements, scoring, data rules, technical constraints, and post-award obligations. | 2026-04-24 |
-| [AI Model and Tool Calling Integration](taipei-city-dashboard/ai-model-and-tool-calling-integration.md) | Documents the Taiwan AI Cloud model, API key flow, backend gateway, tool-calling architecture, and chat-log governance. | 2026-04-24 |
+| [AI Model and Tool Calling Integration](taipei-city-dashboard/ai-model-and-tool-calling-integration.md) | Documents TWAI provider background, competition model access, OpenAI-compatible API setup, backend gateway, tool-calling architecture, and chat-log governance. | 2026-05-02 |
 
 ## taipei-dashboard-backend
 

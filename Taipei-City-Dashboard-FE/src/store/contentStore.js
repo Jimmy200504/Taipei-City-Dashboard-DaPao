@@ -855,6 +855,7 @@ export const useContentStore = defineStore("content", {
 			[
 				...(filterRawData.data.data.metrotaipei || []),
 				...(filterRawData.data.data.taipei || []),
+				...(filterRawData.data.data.public || []),
 			].forEach((item) => {
 				item.components?.forEach((id) => publicComponentID.add(id));
 			});

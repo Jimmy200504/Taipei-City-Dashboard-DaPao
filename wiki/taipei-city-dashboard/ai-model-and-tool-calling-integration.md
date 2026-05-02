@@ -1,17 +1,30 @@
 # AI Model and Tool Calling Integration
 
-> Sources: Taiwan AI Cloud Corporation, 2026-04-08; Taipei City Government Department of Information Technology, 2026-04-10
+> Sources: Taiwan AI Cloud Corporation (Yolinda Kang), 2026-04-08; Taipei City Government Department of Information Technology, 2026-04-10
 > Raw: [2026雙北程式設計節競賽工作坊 模型使用說明簡報](../../raw/hackathon/2026雙北程式設計節競賽工作坊 模型使用說明簡報.pdf); [2026雙北程式設計節競賽工作坊 開發團隊工作坊指南編V2](../../raw/hackathon/2026雙北程式設計節競賽工作坊 開發團隊工作坊指南編V2.pdf)
 
 ## Overview
 
-The hackathon AI setup uses Taiwan AI Cloud's TWCC model service with the dashboard backend acting as a protected gateway. The intended architecture sends user messages to a backend AI chat endpoint, lets the LLM decide whether to call tools, routes tool calls through backend functions or APIs, and records interactions in `ai_chatlog` for audit, debugging, and resource governance.
+The hackathon AI setup uses Taiwan AI Cloud's (TWAI) TWCC model service with the dashboard backend acting as a protected gateway. The intended architecture sends user messages to a backend AI chat endpoint, lets the LLM decide whether to call tools, routes tool calls through backend functions or APIs, and records interactions in `ai_chatlog` for audit, debugging, and resource governance.
+
+## Taiwan AI Cloud (TWAI) Provider Background
+
+Taiwan AI Cloud Corporation (台灣智慧雲端服務股份有限公司, branded TWAI) was established in 2021 through a public-private partnership between the ASUS Group and the Taiwan government. Its core team helped build Taiwan's first AI supercomputer, TAIWANIA 2, in 2018 (total project investment: NT$5 billion). TWAI operates as Asia's first commercial AIHPC public cloud and holds CNCF certification for its Kubernetes-based AI platform.
+
+TWAI positions itself as a Full-Stack AI Foundry covering compute infrastructure, AI model and application services, and compute resource management. Its platforms meet AIEC (Ministry of Digital Affairs AI Evaluation Center) standards. The company is backed by ASUS and serves both enterprise and government customers.
+
+For competition purposes, TWAI provides the designated LLM service and API. Support is available 24 hours at `(02)8979-6199` or `service@twcloud.ai`.
 
 ## Competition Model
 
 The designated model is `Llama3.3-FFM-70B-16K`, with model name `llama3.3-ffm-70b-16k-chat` and a 16K context length.
 
-For testing from April 11 to May 1, teams can register for Taiwan AI Cloud membership and use trial credits. For competition use on May 2 to May 3, the organizers provide API keys. The competition limit is 30 requests per minute per team API key.
+| Period | Purpose | Access method | Estimated concurrent users |
+|--------|---------|---------------|---------------------------|
+| 4/11–5/1 | Pre-competition testing | Register TWAI membership; receive 10,000 trial tokens | ~20 |
+| 5/2–5/3 | Competition use | Organizer-issued API key on competition day | ~250 |
+
+The competition limit is 30 requests per minute per team API key.
 
 ## Taiwan AI Cloud Account and ModelSpace Flow
 
@@ -30,8 +43,6 @@ The model-use slides describe this setup flow:
 11. Retrieve the API endpoint and API key.
 12. Follow the API sample documentation and replace the sample model name with `llama3.3-ffm-70b-16k-chat`.
 
-Taiwan AI Cloud support is listed as 24-hour phone support at `(02)8979-6199` and email `service@twcloud.ai`.
-
 ## Environment Configuration
 
 The workshop guide requires API secrets to be managed through environment variables rather than hardcoded in source. The stated security pattern is to isolate credentials through environment variables and wrap calls through a proxy server or backend gateway.
@@ -43,6 +54,8 @@ Key environment/configuration fields include:
 - `TWCC_MODEL`: the model profile/name.
 - `TIMEOUT`: 60.
 - `MAX_RETRY`: 2.
+
+The AFS ModelSpace Public Mode API is OpenAI-compatible. Teams can use the OpenAI Python client (or any OpenAI-compatible SDK) by setting `base_url` to `f"{API_URL}/models"` and `api_key` to the TWAI key, then specifying `model = "llama3.3-ffm-70b-16k-chat"` in `client.chat.completions.create(...)`.
 
 ## Gateway Endpoint
 

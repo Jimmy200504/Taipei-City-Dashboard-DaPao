@@ -448,15 +448,95 @@ export const useMapStore = defineStore("map", {
 					this.fetchLocalGeoJson(appendLayer);
 				} else if (element.source === "raster") {
 					this.addRasterSource(appendLayer);
+				} else if (element.source === "api") {
+					this.fetchApiGeoJson(appendLayer);
 				}
 			});
 		},
-		// 2. Call an API to get the layer data
+		// 2. Fetch a static geojson file from /mapData/
 		fetchLocalGeoJson(map_config) {
 			axios
 				.get(`/mapData/${map_config.index}.geojson`)
 				.then((rs) => {
 					this.addGeojsonSource(map_config, rs.data);
+				})
+				.catch((e) => console.error(e));
+		},
+		// 2b. Fetch geojson from the backend API (source: "api")
+		// map_config.index must match a known API endpoint key.
+		// Currently supports: ev_charging_stations_tpe / ev_charging_stations_metrotaipei
+		fetchApiGeoJson(map_config) {
+			const cityScope = map_config.index.endsWith("metrotaipei")
+				? "twin_city"
+				: "taipei";
+			const bucketLabels = {
+				slow_ac: "慢充",
+				medium_dc: "中速快充",
+				fast_dc: "快充",
+				ultra_fast_dc: "急速快充",
+				unknown: "未知",
+			};
+			const bucketOrder = ["slow_ac", "medium_dc", "fast_dc", "ultra_fast_dc", "unknown"];
+			const formatPowerSummary = (summary) => {
+				if (!summary || typeof summary !== "object") return "—";
+				const parts = bucketOrder
+					.filter((k) => summary[k])
+					.map((k) => `${bucketLabels[k]} ${summary[k]}`);
+				return parts.length ? parts.join(" / ") : "—";
+			};
+			const formatDataTime = (t) => {
+				if (!t) return "—";
+				const d = new Date(t);
+				if (isNaN(d.getTime())) return t;
+				const pad = (n) => String(n).padStart(2, "0");
+				return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+			};
+			const normalizeServiceTime = (t) => {
+				if (!t) return "—";
+				const s = t.trim();
+				const is24h =
+					/^24H$/i.test(s) ||
+					/^24小時[營開放。]*$/.test(s) ||
+					/^7[x*×]24(\s*小時)?$/.test(s) ||
+					/^7[x*×]24(\s*小時)?(\s*或\s*)每日\/00:00[-~]24:00$/.test(s) ||
+					/^每\s*日\s*[/／]\s*00:00[\s~\-至到]24:00$/.test(s) ||
+					/^每日00:00至24:00$/.test(s) ||
+					/^每日\/00:00~23:59$/.test(s) ||
+					/^每\s*日\s*\/\s*00:00~23:59$/.test(s) ||
+					/^週一~週日\s*00:00~23:59$/.test(s) ||
+					/^24小時\/每日\/00:00-24:00$/.test(s) ||
+					/^平日\/00:00-24:00,假日\s*\/00:00-24:00$/.test(s) ||
+					// All 7 weekdays listed as 00:00～23:59 with no exceptions
+					(/星期[一二三四五六日]：00:00～23:59/.test(s) &&
+						(s.match(/星期[一二三四五六日]：00:00～23:59/g) || []).length === 7 &&
+						!s.includes("11:59"));
+				return is24h ? "24小時營業" : t;
+			};
+			http
+				.get("/component/ev-charging/map", { params: { city_scope: cityScope } })
+				.then((rs) => {
+					const stations = rs.data?.data ?? [];
+					const geojson = {
+						type: "FeatureCollection",
+						features: stations
+							.filter((s) => s.geometry)
+							.map((s) => ({
+								type: "Feature",
+								geometry: s.geometry,
+								properties: {
+									station_name:         s.station_name || "—",
+									spaces:               s.spaces ?? "—",
+									charging_point_count: s.charging_point_count ?? "—",
+									connector_count:      s.connector_count ?? "—",
+									service_time:         normalizeServiceTime(s.service_time),
+									parking_rate:         s.parking_rate || "—",
+									charging_rate:        s.charging_rate || "—",
+									power_summary:        formatPowerSummary(s.power_summary),
+									data_time:            formatDataTime(s.data_time),
+								},
+							})),
+					};
+					this.addGeojsonSource(map_config, geojson);
 				})
 				.catch((e) => console.error(e));
 		},

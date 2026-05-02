@@ -19,6 +19,10 @@ from proj_city_dashboard.env_river_water_quality.river_water_quality_lib import 
     normalize_records,
     parse_month_date,
 )
+from proj_city_dashboard.env_river_water_quality.river_route_generation import (
+    generate_route_features,
+    write_route_geojson,
+)
 
 
 def test_parse_month_date_handles_western_year():
@@ -578,3 +582,97 @@ def test_build_river_segments_returns_empty_for_no_input():
     segments = build_river_segments(empty, None)
     assert segments.empty
     assert "segment_id" in segments.columns
+
+
+def test_generate_route_features_builds_connected_osm_route(tmp_path):
+    latest_df = pd.DataFrame(
+        [
+            _make_latest_row(
+                site_id="S1",
+                station_order=1,
+                longitude=121.500,
+                latitude=25.000,
+                rpi_value=2.0,
+            ),
+            _make_latest_row(
+                site_id="S2",
+                station_order=2,
+                longitude=121.530,
+                latitude=25.000,
+                rpi_value=4.0,
+            ),
+        ]
+    )
+    waterways = gpd.GeoDataFrame(
+        {"name": ["Test River"]},
+        geometry=[
+            LineString(
+                [
+                    (121.501, 25.000),
+                    (121.510, 25.003),
+                    (121.520, 25.002),
+                    (121.529, 25.000),
+                ]
+            )
+        ],
+        crs="EPSG:4326",
+    )
+
+    route_gdf, report = generate_route_features(latest_df, waterways)
+
+    assert report["generated"] == 1
+    assert report["missing"] == []
+    route = route_gdf.iloc[0]
+    assert route["segment_id"] == "RID-A-S1-S2"
+    assert route["river_id"] == "RID-A"
+    assert route["upstream_site_id"] == "S1"
+    assert route["downstream_site_id"] == "S2"
+    assert list(route.geometry.coords)[0] == (121.500, 25.000)
+    assert list(route.geometry.coords)[-1] == (121.530, 25.000)
+    assert len(route.geometry.coords) == 4
+
+    out_path = tmp_path / "routes.geojson"
+    write_route_geojson(route_gdf, out_path)
+    saved = gpd.read_file(out_path)
+    assert saved["segment_id"].tolist() == ["RID-A-S1-S2"]
+
+
+def test_generate_route_features_reports_missing_for_far_station():
+    latest_df = pd.DataFrame(
+        [
+            _make_latest_row(
+                site_id="S1",
+                station_order=1,
+                longitude=121.500,
+                latitude=25.000,
+                rpi_value=2.0,
+            ),
+            _make_latest_row(
+                site_id="S2",
+                station_order=2,
+                longitude=121.900,
+                latitude=25.400,
+                rpi_value=4.0,
+            ),
+        ]
+    )
+    waterways = gpd.GeoDataFrame(
+        {"name": ["Test River"]},
+        geometry=[LineString([(121.501, 25.000), (121.530, 25.000)])],
+        crs="EPSG:4326",
+    )
+
+    route_gdf, report = generate_route_features(
+        latest_df,
+        waterways,
+        max_station_distance_m=500.0,
+    )
+
+    assert route_gdf.empty
+    assert report["generated"] == 0
+    assert len(report["missing"]) == 1
+    missing = report["missing"][0]
+    assert missing["segment_id"] == "RID-A-S1-S2"
+    assert missing["reason"] == "station_too_far_from_waterway"
+    assert missing["upstream_distance_m"] < 500.0
+    assert missing["downstream_distance_m"] > 500.0

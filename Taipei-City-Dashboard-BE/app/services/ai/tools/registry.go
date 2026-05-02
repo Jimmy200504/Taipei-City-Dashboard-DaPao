@@ -6,17 +6,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/tmc/langchaingo/llms"
 )
 
 // ToolFunc defines the signature for a tool function
 type ToolFunc func(ctx context.Context, args string) (string, error)
 
+const (
+	ToolGetCurrentTime       = "get_current_time"
+	ToolGetPopulationSummary = "get_population_summary"
+)
+
 var registry = make(map[string]ToolFunc)
 
 func init() {
 	// Register demo tools
-	Register("get_current_time", GetCurrentTime)
-	Register("get_population_summary", GetPopulationSummary)
+	Register(ToolGetCurrentTime, GetCurrentTime)
+	Register(ToolGetPopulationSummary, GetPopulationSummary)
 }
 
 // Register adds a tool to the registry
@@ -31,6 +38,47 @@ func Execute(ctx context.Context, name string, args string) (string, error) {
 		return "", fmt.Errorf("tool %s not found", name)
 	}
 	return fn(ctx, args)
+}
+
+// Definitions returns the server-owned tools that may be exposed to the model.
+func Definitions() []llms.Tool {
+	return []llms.Tool{
+		{
+			Type: "function",
+			Function: &llms.FunctionDefinition{
+				Name:        ToolGetCurrentTime,
+				Description: "取得目前台北時間。",
+				Parameters: map[string]interface{}{
+					"type":                 "object",
+					"properties":           map[string]interface{}{},
+					"additionalProperties": false,
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: &llms.FunctionDefinition{
+				Name:        ToolGetPopulationSummary,
+				Description: "查詢台北市或新北市指定年份的人口結構摘要。",
+				Parameters: map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"city": map[string]interface{}{
+							"type":        "string",
+							"description": "城市代碼。台北市使用 taipei，新北市使用 new_taipei。",
+							"enum":        []string{"taipei", "new_taipei"},
+						},
+						"year": map[string]interface{}{
+							"type":        "integer",
+							"description": "西元年份。",
+						},
+					},
+					"required":             []string{"city", "year"},
+					"additionalProperties": false,
+				},
+			},
+		},
+	}
 }
 
 // PopulationArgs defines the arguments for the get_population_summary tool
@@ -56,11 +104,11 @@ func GetPopulationSummary(ctx context.Context, args string) (string, error) {
 
 	// Define result structure based on database schema
 	var result struct {
-		Year      int `gorm:"column:year"`
-		Young     int `gorm:"column:young_population"`
-		Working   int `gorm:"column:working_age_population"`
-		Elderly   int `gorm:"column:elderly_population"`
-		DataTime  time.Time `gorm:"column:data_time"`
+		Year     int       `gorm:"column:year"`
+		Young    int       `gorm:"column:young_population"`
+		Working  int       `gorm:"column:working_age_population"`
+		Elderly  int       `gorm:"column:elderly_population"`
+		DataTime time.Time `gorm:"column:data_time"`
 	}
 
 	// Query the dashboard database

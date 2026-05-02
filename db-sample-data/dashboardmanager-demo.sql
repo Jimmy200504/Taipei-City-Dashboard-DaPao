@@ -45,6 +45,19 @@ SELECT 'ev_charging_stations_metrotaipei', '充電站', 'circle', 'api', NULL, N
   '[{"key":"station_name","name":"站名"},{"key":"spaces","name":"充電車位數"},{"key":"charging_point_count","name":"充電樁數"},{"key":"connector_count","name":"充電槍數"},{"key":"service_time","name":"服務時間"},{"key":"parking_rate","name":"停車費率"},{"key":"charging_rate","name":"充電費率"},{"key":"power_summary","name":"充電槍功率摘要"},{"key":"data_time","name":"資料時間"}]'
 WHERE NOT EXISTS (SELECT 1 FROM public.component_maps WHERE index = 'ev_charging_stations_metrotaipei');
 
+-- Repair existing query_charts rows when component_maps were inserted with new sequence IDs.
+UPDATE public.query_charts
+SET map_config_ids = ARRAY[
+  (SELECT id FROM public.component_maps WHERE index = 'ev_charging_stations_tpe' LIMIT 1)
+]
+WHERE index = 'ev_charging_district_stations' AND city = 'taipei';
+
+UPDATE public.query_charts
+SET map_config_ids = ARRAY[
+  (SELECT id FROM public.component_maps WHERE index = 'ev_charging_stations_metrotaipei' LIMIT 1)
+]
+WHERE index = 'ev_charging_district_stations' AND city = 'metrotaipei';
+
 -- dashboards (sequence auto-assigns id; components array references component ids by subquery)
 INSERT INTO public.dashboards (index, name, components, icon, updated_at, created_at)
 SELECT

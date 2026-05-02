@@ -455,12 +455,9 @@ export const useMapStore = defineStore("map", {
 		},
 		// 2. Fetch a static geojson file from /mapData/
 		fetchLocalGeoJson(map_config) {
-			axios
-				.get(`/mapData/${map_config.index}.geojson`)
-				.then((rs) => {
-					this.addGeojsonSource(map_config, rs.data);
-				})
-				.catch((e) => console.error(e));
+			// Pass URL directly so Mapbox fetches and tiles in a Web Worker,
+			// avoiding main-thread JSON parsing of large files.
+			this.addGeojsonSource(map_config, `/mapData/${map_config.index}.geojson`);
 		},
 		// 2b. Fetch geojson from the backend API (source: "api")
 		// map_config.index must match a known API endpoint key.
@@ -548,7 +545,7 @@ export const useMapStore = defineStore("map", {
 			) {
 				this.map.addSource(`${map_config.layerId}-source`, {
 					type: "geojson",
-					data: { ...data },
+					data: typeof data === "string" ? data : { ...data },
 				});
 			}
 			if (map_config.type === "arc") {

@@ -1,0 +1,37 @@
+{
+  "dag_infos": {
+    "dag_id": "streetlight_watt_ntpe",
+    "start_date": "2026-05-01",
+    "schedule_interval": "0 4 * * 1",
+    "catchup": false,
+    "tags": ["streetlight", "工務局", "路燈", "新北市路燈瓦數"],
+    "description": "Weekly ETL for New Taipei City streetlight wattage data. Requires TPE ETL to complete first. Also refreshes metrotaipei (dual-city) district summary tables.",
+    "default_args": {
+      "owner": "airflow",
+      "email": ["DEFAULT_EMAIL_LIST"],
+      "email_on_retry": false,
+      "email_on_failure": true,
+      "retries": 1,
+      "retry_delay": 60
+    },
+    "ready_data_db": "postgres_default",
+    "ready_data_default_table": "env_streetlight_assets_ntpe",
+    "ready_data_history_table": "",
+    "raw_data_db": "postgres_default",
+    "raw_data_table": "",
+    "load_behavior": "replace"
+  },
+  "data_infos": {
+    "name_cn": "新北市路燈瓦數分布",
+    "airflow_update_freq": "04:00+8 每週一（TPE 完成後）",
+    "source": "https://data.ntpc.gov.tw/api/datasets/39149fe0-85ab-4e6c-99e5-60657d44895f/json",
+    "source_type": "paginated json api",
+    "source_dept": "新北市工務局",
+    "gis_format": "Point",
+    "output_coordinate": "WGS84",
+    "is_geometry": 1,
+    "dataset_description": "新北市各行政區路燈位置與瓦數資料，一筆記錄代表一盞路燈，已提供 WGS84 座標。無燈種與裝設年分資訊。",
+    "etl_description": "以 limit/offset 分頁抓取新北市路燈 API（共約 28 萬筆），清理 power 字串，過濾零瓦數記錄，指定瓦數等級，並更新雙北合併聚合表（metrotaipei scope）。",
+    "sensitivity": "public"
+  }
+}

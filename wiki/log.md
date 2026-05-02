@@ -40,3 +40,6 @@
 ## [2026-04-28] ingest | Data-End Project Setup
 - Updated: Data-End Architecture
 - Updated: Airflow DAG Development
+
+## [2026-05-02] ingest | Noise Monitoring ETL Pipeline
+- Updated: Noise Monitoring Backend Component

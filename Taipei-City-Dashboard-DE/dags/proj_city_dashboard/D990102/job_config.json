@@ -1,0 +1,37 @@
+{
+    "dag_infos": {
+        "dag_id": "D990102",
+        "start_date": "2026-01-01",
+        "schedule_interval": "0 4 1 1 *",
+        "catchup": false,
+        "tags": ["env_noise", "新北市環保局", "噪音", "pdf"],
+        "description": "Yearly noise measurement data parsed from New Taipei EPA annual PDF report.",
+        "default_args": {
+            "owner": "airflow",
+            "email": ["DEFAULT_EMAIL_LIST"],
+            "email_on_retry": false,
+            "email_on_failure": true,
+            "retries": 1,
+            "retry_delay": 60
+        },
+        "ready_data_db": "postgres_default",
+        "ready_data_default_table": "env_noise_quarterly_stats_new_tpe",
+        "ready_data_history_table": "",
+        "raw_data_db": "postgres_default",
+        "raw_data_table": "",
+        "load_behavior": "append"
+    },
+    "data_infos": {
+        "name_cn": "新北市噪音監測年報量測值",
+        "airflow_update_freq": "04:00+8 Jan 1 every year",
+        "source": "https://www.epd.ntpc.gov.tw/IntegratedContentCenter/noisestats?categoryId=6ca80917-078a-4bd6-8a54-f67cb75d8d80",
+        "source_type": "pdf_parsing",
+        "source_dept": "新北市環境保護局",
+        "gis_format": null,
+        "output_coordinate": "EPSG:4326",
+        "is_geometry": 0,
+        "dataset_description": "新北市噪音監測站每月日間/晚間/夜間均能音量量測值（年報），含交通噪音與環境噪音兩類；資料滯後約一年",
+        "etl_description": "download and parse PDF annual report using pdfplumber, scrape station addresses from manual/auto-station pages, geocode new stations (TGOS/HERE API), upsert monthly measurements and station master tables",
+        "sensitivity": "public"
+    }
+}

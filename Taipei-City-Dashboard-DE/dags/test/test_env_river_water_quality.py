@@ -1,8 +1,11 @@
+from pathlib import Path
+
 import geopandas as gpd
 import pandas as pd
-from shapely.geometry import LineString
+from shapely.geometry import LineString, Point
 
 from proj_city_dashboard.env_river_water_quality.river_water_quality_lib import (
+    GEOMETRY_SOURCE_CURATED_ROUTE,
     GEOMETRY_SOURCE_REAL_RIVER,
     GEOMETRY_SOURCE_STRAIGHT_LINE,
     RPI_FLAG_COMPLETE,
@@ -10,6 +13,8 @@ from proj_city_dashboard.env_river_water_quality.river_water_quality_lib import 
     SOURCE_NAME,
     TARGET_CITIES,
     build_river_segments,
+    export_geojson_layers,
+    load_curated_route_geodataframe,
     map_risk_level,
     normalize_records,
     parse_month_date,
@@ -137,10 +142,43 @@ def _make_latest_row(**overrides):
 def test_build_river_segments_uses_real_river_geometry_and_handles_cross_city():
     latest_df = pd.DataFrame(
         [
-            _make_latest_row(site_id="S1", site_name="上游", station_order=1, longitude=121.500, latitude=25.000, rpi_value=2.0, city="臺北市"),
-            _make_latest_row(site_id="S2", site_name="中游", station_order=2, longitude=121.510, latitude=25.005, rpi_value=4.0, city="臺北市"),
-            _make_latest_row(site_id="S3", site_name="下游", station_order=3, longitude=121.520, latitude=25.000, rpi_value=6.0, city="新北市"),
-            _make_latest_row(site_id="S4", site_name="孤站", river="磺溪", river_id="RID-LONELY", station_order=1, longitude=121.60, latitude=25.18, rpi_value=1.5),
+            _make_latest_row(
+                site_id="S1",
+                site_name="上游",
+                station_order=1,
+                longitude=121.500,
+                latitude=25.000,
+                rpi_value=2.0,
+                city="臺北市",
+            ),
+            _make_latest_row(
+                site_id="S2",
+                site_name="中游",
+                station_order=2,
+                longitude=121.510,
+                latitude=25.005,
+                rpi_value=4.0,
+                city="臺北市",
+            ),
+            _make_latest_row(
+                site_id="S3",
+                site_name="下游",
+                station_order=3,
+                longitude=121.520,
+                latitude=25.000,
+                rpi_value=6.0,
+                city="新北市",
+            ),
+            _make_latest_row(
+                site_id="S4",
+                site_name="孤站",
+                river="磺溪",
+                river_id="RID-LONELY",
+                station_order=1,
+                longitude=121.60,
+                latitude=25.18,
+                rpi_value=1.5,
+            ),
         ]
     )
 
@@ -179,11 +217,349 @@ def test_build_river_segments_uses_real_river_geometry_and_handles_cross_city():
     assert lonely.empty
 
 
+def test_build_river_segments_prefers_curated_route_geometry():
+    latest_df = pd.DataFrame(
+        [
+            _make_latest_row(
+                site_id="S1",
+                station_order=1,
+                longitude=121.40,
+                latitude=24.93,
+                rpi_value=2.0,
+            ),
+            _make_latest_row(
+                site_id="S2",
+                station_order=2,
+                longitude=121.42,
+                latitude=24.94,
+                rpi_value=4.0,
+            ),
+        ]
+    )
+    route = LineString(
+        [
+            (121.40, 24.93),
+            (121.405, 24.935),
+            (121.415, 24.938),
+            (121.42, 24.94),
+        ]
+    )
+    route_gdf = gpd.GeoDataFrame(
+        {
+            "river_id": ["RID-A"],
+            "upstream_site_id": ["S1"],
+            "downstream_site_id": ["S2"],
+        },
+        geometry=[route],
+        crs="EPSG:4326",
+    )
+
+    segments = build_river_segments(latest_df, wra_gdf=None, route_gdf=route_gdf)
+
+    assert len(segments) == 1
+    row = segments.iloc[0]
+    assert row["geometry_source"] == GEOMETRY_SOURCE_CURATED_ROUTE
+    assert list(row["wkb_geometry"].coords) == list(route.coords)
+
+
+def test_build_river_segments_snaps_near_curated_route_endpoints_to_sites():
+    latest_df = pd.DataFrame(
+        [
+            _make_latest_row(
+                site_id="S1",
+                station_order=1,
+                longitude=121.40,
+                latitude=24.93,
+                rpi_value=2.0,
+            ),
+            _make_latest_row(
+                site_id="S2",
+                station_order=2,
+                longitude=121.42,
+                latitude=24.94,
+                rpi_value=4.0,
+            ),
+        ]
+    )
+    route = LineString(
+        [
+            (121.401, 24.930),
+            (121.405, 24.935),
+            (121.415, 24.938),
+            (121.419, 24.940),
+        ]
+    )
+    route_gdf = gpd.GeoDataFrame(
+        {"segment_id": ["RID-A-S1-S2"]},
+        geometry=[route],
+        crs="EPSG:4326",
+    )
+
+    segments = build_river_segments(latest_df, wra_gdf=None, route_gdf=route_gdf)
+
+    coords = list(segments.iloc[0]["wkb_geometry"].coords)
+    assert coords[0] == (121.40, 24.93)
+    assert coords[-1] == (121.42, 24.94)
+
+
+def test_build_river_segments_matches_curated_route_by_explicit_segment_id():
+    latest_df = pd.DataFrame(
+        [
+            _make_latest_row(
+                site_id="S1",
+                station_order=1,
+                longitude=121.40,
+                latitude=24.93,
+                rpi_value=2.0,
+            ),
+            _make_latest_row(
+                site_id="S2",
+                station_order=2,
+                longitude=121.42,
+                latitude=24.94,
+                rpi_value=4.0,
+            ),
+        ]
+    )
+    route = LineString([(121.40, 24.93), (121.41, 24.945), (121.42, 24.94)])
+    route_gdf = gpd.GeoDataFrame(
+        {
+            "segment_id": ["RID-A-S1-S2"],
+            "river_id": ["WRONG-RIVER"],
+            "upstream_site_id": ["WRONG-UP"],
+            "downstream_site_id": ["WRONG-DOWN"],
+        },
+        geometry=[route],
+        crs="EPSG:4326",
+    )
+
+    segments = build_river_segments(latest_df, wra_gdf=None, route_gdf=route_gdf)
+
+    assert len(segments) == 1
+    row = segments.iloc[0]
+    assert row["geometry_source"] == GEOMETRY_SOURCE_CURATED_ROUTE
+    assert list(row["wkb_geometry"].coords) == list(route.coords)
+
+
+def test_load_curated_route_geodataframe_returns_none_when_asset_missing(tmp_path):
+    missing_path = tmp_path / "missing.geojson"
+
+    assert load_curated_route_geodataframe(str(missing_path)) is None
+
+
+def test_curated_route_asset_uses_dense_centerline_for_tamsui_river():
+    route_path = (
+        Path(__file__).resolve().parents[1]
+        / "proj_city_dashboard"
+        / "env_river_water_quality"
+        / "assets"
+        / "river_segment_routes.geojson"
+    )
+
+    routes = load_curated_route_geodataframe(str(route_path))
+    tamsui = routes[
+        (routes["river_id"] == "11400011")
+        & (routes["upstream_site_id"] == "1001")
+        & (routes["downstream_site_id"] == "1002")
+    ].iloc[0]
+
+    assert len(tamsui.geometry.coords) >= 10
+
+
+def test_curated_route_asset_covers_current_metrotaipei_segments():
+    route_path = (
+        Path(__file__).resolve().parents[1]
+        / "proj_city_dashboard"
+        / "env_river_water_quality"
+        / "assets"
+        / "river_segment_routes.geojson"
+    )
+
+    routes = load_curated_route_geodataframe(str(route_path))
+    segment_ids = {
+        f"{row.river_id}-{row.upstream_site_id}-{row.downstream_site_id}"
+        for row in routes.itertuples()
+    }
+
+    assert len(segment_ids) >= 29
+    assert "11402311-1024-1274" in segment_ids
+
+
+def test_export_geojson_layers_omits_sites_without_visible_segments(tmp_path):
+    latest_gdf = gpd.GeoDataFrame(
+        [
+            {
+                "site_id": "S1",
+                "site_name": "Connected A",
+                "city": TARGET_CITIES[0],
+                "district": None,
+                "basin": "Test basin",
+                "river": "Test river",
+                "wq_std_grade": "丙",
+                "sample_month": pd.Timestamp("2026-03-01").date(),
+                "rpi_value": 2.0,
+                "risk_level": "mild",
+                "rpi_flag": RPI_FLAG_COMPLETE,
+                "source_name": SOURCE_NAME,
+                "data_time": "2026-04-01 00:00:00+08",
+                "wkb_geometry": Point(121.50, 25.00),
+            },
+            {
+                "site_id": "S2",
+                "site_name": "Connected B",
+                "city": TARGET_CITIES[0],
+                "district": None,
+                "basin": "Test basin",
+                "river": "Test river",
+                "wq_std_grade": "丙",
+                "sample_month": pd.Timestamp("2026-03-01").date(),
+                "rpi_value": 3.0,
+                "risk_level": "moderate",
+                "rpi_flag": RPI_FLAG_COMPLETE,
+                "source_name": SOURCE_NAME,
+                "data_time": "2026-04-01 00:00:00+08",
+                "wkb_geometry": Point(121.51, 25.01),
+            },
+            {
+                "site_id": "S3",
+                "site_name": "Isolated",
+                "city": TARGET_CITIES[0],
+                "district": None,
+                "basin": "Test basin",
+                "river": "Test river",
+                "wq_std_grade": "丙",
+                "sample_month": pd.Timestamp("2026-03-01").date(),
+                "rpi_value": None,
+                "risk_level": None,
+                "rpi_flag": RPI_FLAG_INCOMPLETE,
+                "source_name": SOURCE_NAME,
+                "data_time": "2026-04-01 00:00:00+08",
+                "wkb_geometry": Point(121.52, 25.02),
+            },
+        ],
+        geometry="wkb_geometry",
+        crs="EPSG:4326",
+    )
+    segments_gdf = gpd.GeoDataFrame(
+        [
+            {
+                "segment_id": "RID-S1-S2",
+                "river_id": "RID",
+                "river": "Test river",
+                "basin": "Test basin",
+                "upstream_site_id": "S1",
+                "upstream_site_name": "Connected A",
+                "upstream_city": TARGET_CITIES[0],
+                "upstream_rpi": 2.0,
+                "downstream_site_id": "S2",
+                "downstream_site_name": "Connected B",
+                "downstream_city": TARGET_CITIES[0],
+                "downstream_rpi": 3.0,
+                "sample_month": pd.Timestamp("2026-03-01").date(),
+                "geometry_source": GEOMETRY_SOURCE_CURATED_ROUTE,
+                "data_time": "2026-04-01 00:00:00+08",
+                "wkb_geometry": LineString([(121.50, 25.00), (121.51, 25.01)]),
+            }
+        ],
+        geometry="wkb_geometry",
+        crs="EPSG:4326",
+    )
+
+    export_geojson_layers(latest_gdf, segments_gdf, out_dir=str(tmp_path))
+
+    sites = gpd.read_file(tmp_path / "env_river_sites_taipei.geojson")
+    assert sorted(sites["site_id"].tolist()) == ["S1", "S2"]
+
+
+def test_export_geojson_layers_omits_segments_far_from_site_endpoint(tmp_path):
+    latest_gdf = gpd.GeoDataFrame(
+        [
+            {
+                "site_id": "S1",
+                "site_name": "Connected A",
+                "city": TARGET_CITIES[0],
+                "district": None,
+                "basin": "Test basin",
+                "river": "Test river",
+                "wq_std_grade": "丙",
+                "sample_month": pd.Timestamp("2026-03-01").date(),
+                "rpi_value": 2.0,
+                "risk_level": "mild",
+                "rpi_flag": RPI_FLAG_COMPLETE,
+                "source_name": SOURCE_NAME,
+                "data_time": "2026-04-01 00:00:00+08",
+                "wkb_geometry": Point(121.50, 25.00),
+            },
+            {
+                "site_id": "S2",
+                "site_name": "Disconnected B",
+                "city": TARGET_CITIES[0],
+                "district": None,
+                "basin": "Test basin",
+                "river": "Test river",
+                "wq_std_grade": "丙",
+                "sample_month": pd.Timestamp("2026-03-01").date(),
+                "rpi_value": 3.0,
+                "risk_level": "moderate",
+                "rpi_flag": RPI_FLAG_COMPLETE,
+                "source_name": SOURCE_NAME,
+                "data_time": "2026-04-01 00:00:00+08",
+                "wkb_geometry": Point(121.60, 25.10),
+            },
+        ],
+        geometry="wkb_geometry",
+        crs="EPSG:4326",
+    )
+    segments_gdf = gpd.GeoDataFrame(
+        [
+            {
+                "segment_id": "RID-S1-S2",
+                "river_id": "RID",
+                "river": "Test river",
+                "basin": "Test basin",
+                "upstream_site_id": "S1",
+                "upstream_site_name": "Connected A",
+                "upstream_city": TARGET_CITIES[0],
+                "upstream_rpi": 2.0,
+                "downstream_site_id": "S2",
+                "downstream_site_name": "Disconnected B",
+                "downstream_city": TARGET_CITIES[0],
+                "downstream_rpi": 3.0,
+                "sample_month": pd.Timestamp("2026-03-01").date(),
+                "geometry_source": GEOMETRY_SOURCE_CURATED_ROUTE,
+                "data_time": "2026-04-01 00:00:00+08",
+                "wkb_geometry": LineString([(121.50, 25.00), (121.51, 25.01)]),
+            }
+        ],
+        geometry="wkb_geometry",
+        crs="EPSG:4326",
+    )
+
+    export_geojson_layers(latest_gdf, segments_gdf, out_dir=str(tmp_path))
+
+    sites = gpd.read_file(tmp_path / "env_river_sites_taipei.geojson")
+    segments = gpd.read_file(tmp_path / "env_river_segments_taipei.geojson")
+    assert sites.empty
+    assert segments.empty
+
+
 def test_build_river_segments_falls_back_to_straight_line_when_river_missing():
     latest_df = pd.DataFrame(
         [
-            _make_latest_row(site_id="S1", station_order=1, longitude=121.40, latitude=24.93, rpi_value=2.0),
-            _make_latest_row(site_id="S2", station_order=2, longitude=121.42, latitude=24.94, rpi_value=4.0),
+            _make_latest_row(
+                site_id="S1",
+                station_order=1,
+                longitude=121.40,
+                latitude=24.93,
+                rpi_value=2.0,
+            ),
+            _make_latest_row(
+                site_id="S2",
+                station_order=2,
+                longitude=121.42,
+                latitude=24.94,
+                rpi_value=4.0,
+            ),
         ]
     )
     empty_wra = gpd.GeoDataFrame({"NAME": []}, geometry=[], crs="EPSG:4326")

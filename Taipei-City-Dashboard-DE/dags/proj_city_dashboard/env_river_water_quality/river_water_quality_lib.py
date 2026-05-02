@@ -37,6 +37,7 @@ RPI_FLAG_COMPLETE = "complete"
 RPI_FLAG_INCOMPLETE = "incomplete"
 GEOMETRY_SOURCE_REAL_RIVER = "real_river"
 GEOMETRY_SOURCE_STRAIGHT_LINE = "straight_line"
+GEOMETRY_SOURCE_CURATED_ROUTE = "curated_route"
 
 RISK_LEVEL_MAP = {
     "未（稍）受污染": ("unpolluted", 1),
@@ -49,6 +50,8 @@ RISK_LEVEL_MAP = {
 INCOMPLETE_LABEL = "無檢測資料"
 
 STATION_OFF_RIVER_TOLERANCE_M = 1500.0
+ROUTE_ENDPOINT_SNAP_TOLERANCE_M = 750.0
+SITE_ENDPOINT_EXPORT_TOLERANCE_M = 75.0
 
 _MONTH_PATTERN = re.compile(r"(\d{3,4})\s*年\s*(\d{1,2})\s*月")
 
@@ -245,6 +248,12 @@ def fetch_wra_river_geodataframe(
     return gpd.read_file(f"zip://{cache_path}!river/river.shp")
 
 
+def load_curated_route_geodataframe(path: str) -> Optional[gpd.GeoDataFrame]:
+    if not path or not os.path.exists(path):
+        return None
+    return gpd.read_file(path)
+
+
 def _straight_line_segment(upstream_row, downstream_row) -> LineString:
     return LineString(
         [
@@ -252,6 +261,10 @@ def _straight_line_segment(upstream_row, downstream_row) -> LineString:
             (float(downstream_row["longitude"]), float(downstream_row["latitude"])),
         ]
     )
+
+
+def _station_point(station_row) -> Point:
+    return Point(float(station_row["longitude"]), float(station_row["latitude"]))
 
 
 def _haversine_meters(p1: Point, p2: Point) -> float:
@@ -329,6 +342,69 @@ def _real_river_geometry(
     return geom
 
 
+def _segment_id(river_id, upstream_site_id, downstream_site_id) -> str:
+    return f"{river_id}-{upstream_site_id}-{downstream_site_id}"
+
+
+def _replace_endpoint_if_close(
+    coords: List[tuple],
+    station_point: Point,
+    endpoint_index: int,
+) -> None:
+    endpoint = Point(coords[endpoint_index])
+    if _haversine_meters(station_point, endpoint) <= ROUTE_ENDPOINT_SNAP_TOLERANCE_M:
+        coords[endpoint_index] = (station_point.x, station_point.y)
+
+
+def _snap_segment_geometry_to_stations(
+    geom: LineString,
+    upstream_row,
+    downstream_row,
+) -> LineString:
+    if geom is None or geom.is_empty or geom.geom_type != "LineString":
+        return geom
+
+    coords = list(geom.coords)
+    if len(coords) < 2:
+        return geom
+
+    _replace_endpoint_if_close(coords, _station_point(upstream_row), 0)
+    _replace_endpoint_if_close(coords, _station_point(downstream_row), -1)
+    return LineString(coords)
+
+
+def _index_curated_routes(
+    route_gdf: Optional[gpd.GeoDataFrame],
+) -> Dict[str, LineString]:
+    if route_gdf is None or len(route_gdf) == 0:
+        return {}
+    routes = route_gdf.copy()
+    if routes.crs is not None and str(routes.crs).upper() != "EPSG:4326":
+        routes = routes.to_crs("EPSG:4326")
+
+    out: Dict[str, LineString] = {}
+    for _, row in routes.iterrows():
+        geom = row.geometry
+        if (
+            geom is None
+            or geom.is_empty
+            or geom.geom_type not in ("LineString", "MultiLineString")
+        ):
+            continue
+
+        segment_id = _to_str_or_none(row.get("segment_id"))
+        if not segment_id:
+            river_id = _to_str_or_none(row.get("river_id"))
+            upstream_site_id = _to_str_or_none(row.get("upstream_site_id"))
+            downstream_site_id = _to_str_or_none(row.get("downstream_site_id"))
+            if not river_id or not upstream_site_id or not downstream_site_id:
+                continue
+            segment_id = _segment_id(river_id, upstream_site_id, downstream_site_id)
+
+        out[segment_id] = geom
+    return out
+
+
 def _index_river_features(
     wra_gdf: gpd.GeoDataFrame, moenv_river_names
 ) -> Dict[str, List[LineString]]:
@@ -355,6 +431,7 @@ def _index_river_features(
 def build_river_segments(
     latest_df: pd.DataFrame,
     wra_gdf: Optional[gpd.GeoDataFrame] = None,
+    route_gdf: Optional[gpd.GeoDataFrame] = None,
 ) -> pd.DataFrame:
     empty = pd.DataFrame(columns=_SEGMENT_COLUMNS)
     if latest_df is None or latest_df.empty:
@@ -370,6 +447,7 @@ def build_river_segments(
     df["station_order"] = df["station_order"].astype(int)
 
     river_features = _index_river_features(wra_gdf, df["river"].unique().tolist())
+    curated_routes = _index_curated_routes(route_gdf)
 
     rows: List[dict] = []
     for (river_id, river_name), group in df.groupby(["river_id", "river"], dropna=False):
@@ -388,18 +466,42 @@ def build_river_segments(
 
         if not features or all(p is None for p in projections):
             logger.warning(
-                "River %r: no WRA features matched within tolerance; %d segments use straight_line.",
+                (
+                    "River %r: no WRA features matched within tolerance; "
+                    "%d segments use straight_line."
+                ),
                 river_name,
                 max(0, len(ordered) - 1),
             )
 
         for i in range(len(ordered) - 1):
             s_a, s_b = ordered[i], ordered[i + 1]
+            segment_id = _segment_id(river_id, s_a["site_id"], s_b["site_id"])
+            curated_geom = curated_routes.get(segment_id)
+            if curated_geom is not None:
+                curated_geom = _snap_segment_geometry_to_stations(
+                    curated_geom,
+                    s_a,
+                    s_b,
+                )
+                rows.append(
+                    _segment_row(
+                        river_id,
+                        river_name,
+                        s_a,
+                        s_b,
+                        curated_geom,
+                        GEOMETRY_SOURCE_CURATED_ROUTE,
+                    )
+                )
+                continue
+
             proj_a, proj_b = projections[i], projections[i + 1]
             geom = None
             if features and proj_a is not None and proj_b is not None:
                 geom = _real_river_geometry(features, proj_a, proj_b)
             if geom is not None:
+                geom = _snap_segment_geometry_to_stations(geom, s_a, s_b)
                 source = GEOMETRY_SOURCE_REAL_RIVER
             else:
                 geom = _straight_line_segment(s_a, s_b)
@@ -459,32 +561,113 @@ def export_geojson_layers(
     sites = latest_gdf[latest_gdf["wkb_geometry"].notna()].copy()
     sites["sample_month"] = sites["sample_month"].map(_iso_or_none)
 
-    _write_geojson(
-        sites[sites["city"] == taipei],
-        _SITE_GEOJSON_PROPS,
-        os.path.join(out_dir, "env_river_sites_taipei.geojson"),
-    )
-    _write_geojson(
-        sites,
-        _SITE_GEOJSON_PROPS,
-        os.path.join(out_dir, "env_river_sites_metrotaipei.geojson"),
-    )
-
     segs_taipei_path = os.path.join(out_dir, "env_river_segments_taipei.geojson")
     segs_metro_path = os.path.join(out_dir, "env_river_segments_metrotaipei.geojson")
     if segments_gdf is None or segments_gdf.empty:
+        _write_empty_collection(os.path.join(out_dir, "env_river_sites_taipei.geojson"))
+        _write_empty_collection(
+            os.path.join(out_dir, "env_river_sites_metrotaipei.geojson")
+        )
         _write_empty_collection(segs_taipei_path)
         _write_empty_collection(segs_metro_path)
         return
 
     segs = segments_gdf[segments_gdf["wkb_geometry"].notna()].copy()
     segs["sample_month"] = segs["sample_month"].map(_iso_or_none)
+    segs = _segments_connected_to_sites(segs, sites)
 
     segs_taipei = segs[
         (segs["upstream_city"] == taipei) & (segs["downstream_city"] == taipei)
     ]
+    taipei_site_ids = _connected_site_ids_from_segments(segs_taipei, sites)
+    metro_site_ids = _connected_site_ids_from_segments(segs, sites)
+
+    _write_geojson(
+        sites[(sites["city"] == taipei) & (sites["site_id"].isin(taipei_site_ids))],
+        _SITE_GEOJSON_PROPS,
+        os.path.join(out_dir, "env_river_sites_taipei.geojson"),
+    )
+    _write_geojson(
+        sites[sites["site_id"].isin(metro_site_ids)],
+        _SITE_GEOJSON_PROPS,
+        os.path.join(out_dir, "env_river_sites_metrotaipei.geojson"),
+    )
     _write_geojson(segs_taipei, _SEGMENT_GEOJSON_PROPS, segs_taipei_path)
     _write_geojson(segs, _SEGMENT_GEOJSON_PROPS, segs_metro_path)
+
+
+def _site_ids_from_segments(segs: gpd.GeoDataFrame) -> set:
+    if segs is None or segs.empty:
+        return set()
+    upstream = set(segs["upstream_site_id"].dropna().astype(str))
+    downstream = set(segs["downstream_site_id"].dropna().astype(str))
+    return upstream | downstream
+
+
+def _connected_site_ids_from_segments(
+    segs: gpd.GeoDataFrame,
+    sites: gpd.GeoDataFrame,
+) -> set:
+    if segs is None or segs.empty or sites is None or sites.empty:
+        return set()
+
+    site_points = {
+        str(row.site_id): row.wkb_geometry
+        for row in sites[["site_id", "wkb_geometry"]].itertuples()
+        if row.wkb_geometry is not None and not row.wkb_geometry.is_empty
+    }
+
+    connected = set()
+    for row in segs.itertuples():
+        geom = row.wkb_geometry
+        if geom is None or geom.is_empty or geom.geom_type != "LineString":
+            continue
+        endpoints = (
+            (str(row.upstream_site_id), Point(geom.coords[0])),
+            (str(row.downstream_site_id), Point(geom.coords[-1])),
+        )
+        for site_id, endpoint in endpoints:
+            site_point = site_points.get(site_id)
+            if site_point is None:
+                continue
+            if (
+                _endpoint_is_connected_to_site(site_point, endpoint)
+            ):
+                connected.add(site_id)
+    return connected
+
+
+def _segments_connected_to_sites(
+    segs: gpd.GeoDataFrame,
+    sites: gpd.GeoDataFrame,
+) -> gpd.GeoDataFrame:
+    if segs is None or segs.empty or sites is None or sites.empty:
+        return segs
+
+    site_points = {
+        str(row.site_id): row.wkb_geometry
+        for row in sites[["site_id", "wkb_geometry"]].itertuples()
+        if row.wkb_geometry is not None and not row.wkb_geometry.is_empty
+    }
+    keep_indexes = []
+    for idx, row in segs.iterrows():
+        geom = row["wkb_geometry"]
+        if geom is None or geom.is_empty or geom.geom_type != "LineString":
+            continue
+        upstream = site_points.get(str(row["upstream_site_id"]))
+        downstream = site_points.get(str(row["downstream_site_id"]))
+        if upstream is None or downstream is None:
+            continue
+        if _endpoint_is_connected_to_site(upstream, Point(geom.coords[0])) and (
+            _endpoint_is_connected_to_site(downstream, Point(geom.coords[-1]))
+        ):
+            keep_indexes.append(idx)
+
+    return segs.loc[keep_indexes].copy()
+
+
+def _endpoint_is_connected_to_site(site_point: Point, endpoint: Point) -> bool:
+    return _haversine_meters(site_point, endpoint) <= SITE_ENDPOINT_EXPORT_TOLERANCE_M
 
 
 def _iso_or_none(value):
@@ -515,7 +698,7 @@ def _write_empty_collection(path: str) -> None:
 
 def _segment_row(river_id, river_name, upstream, downstream, geom, source) -> dict:
     return {
-        "segment_id": f"{river_id}-{upstream['site_id']}-{downstream['site_id']}",
+        "segment_id": _segment_id(river_id, upstream["site_id"], downstream["site_id"]),
         "river_id": river_id,
         "river": river_name,
         "basin": upstream["basin"],
@@ -526,7 +709,11 @@ def _segment_row(river_id, river_name, upstream, downstream, geom, source) -> di
         "downstream_site_id": downstream["site_id"],
         "downstream_site_name": downstream["site_name"],
         "downstream_city": downstream["city"],
-        "downstream_rpi": float(downstream["rpi_value"]) if pd.notna(downstream["rpi_value"]) else None,
+        "downstream_rpi": (
+            float(downstream["rpi_value"])
+            if pd.notna(downstream["rpi_value"])
+            else None
+        ),
         "sample_month": upstream["sample_month"],
         "geometry_source": source,
         "data_time": upstream["data_time"],

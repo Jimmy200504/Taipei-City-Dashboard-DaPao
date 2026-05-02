@@ -19,6 +19,7 @@ def _env_river_water_quality(**kwargs):
         export_geojson_layers,
         fetch_river_station_records,
         fetch_wra_river_geodataframe,
+        load_curated_route_geodataframe,
         normalize_records,
     )
 
@@ -49,7 +50,13 @@ def _env_river_water_quality(**kwargs):
         raise ValueError("No 臺北市/新北市 river stations were extracted from MOENV.")
 
     wra_gdf = fetch_wra_river_geodataframe(cache_dir, session=session)
-    segments_df = build_river_segments(latest_df, wra_gdf)
+    route_path = os.path.join(
+        os.path.dirname(__file__),
+        "assets",
+        "river_segment_routes.geojson",
+    )
+    route_gdf = load_curated_route_geodataframe(route_path)
+    segments_df = build_river_segments(latest_df, wra_gdf, route_gdf=route_gdf)
 
     def _to_point(lon, lat):
         if pd.isna(lon) or pd.isna(lat):

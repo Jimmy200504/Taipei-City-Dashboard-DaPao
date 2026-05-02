@@ -4,6 +4,10 @@ import http from "../router/axios";
 
 const recommendChatStorageKey = "recommendChatData";
 const aiChatStorageKey = "aiChatData";
+const apiRoleByChatRole = {
+	user: "user",
+	bot: "assistant",
+};
 
 const defaultRecommendChatData = [
 	{
@@ -45,6 +49,16 @@ function appendMessage(targetChatData, newChatData) {
 		isDefault: false,
 		...newChatData,
 	});
+}
+
+function toAiChatApiMessages(chatData) {
+	return chatData
+		.filter((item) => !item.isDefault && item.content?.trim())
+		.map((item) => ({
+			role: apiRoleByChatRole[item.role],
+			content: item.content,
+		}))
+		.filter((item) => item.role);
 }
 
 function dedupeRecommendedComponents(components) {
@@ -185,12 +199,7 @@ export const useChatStore = defineStore("chat", () => {
 			const response = await http.post("/ai/chat/twai", {
 				session: getDailySessionId(),
 				stream: false,
-				messages: [
-					{
-						role: "user",
-						content: newChatData.content,
-					},
-				],
+				messages: toAiChatApiMessages(aiChatData.value),
 			});
 
 			const answer = response.data?.data?.content;

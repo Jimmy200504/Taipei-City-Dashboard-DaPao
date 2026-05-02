@@ -453,12 +453,9 @@ export const useMapStore = defineStore("map", {
 		},
 		// 2. Call an API to get the layer data
 		fetchLocalGeoJson(map_config) {
-			axios
-				.get(`/mapData/${map_config.index}.geojson`)
-				.then((rs) => {
-					this.addGeojsonSource(map_config, rs.data);
-				})
-				.catch((e) => console.error(e));
+			// Pass URL directly so Mapbox fetches and tiles in a Web Worker,
+			// avoiding main-thread JSON parsing of large files.
+			this.addGeojsonSource(map_config, `/mapData/${map_config.index}.geojson`);
 		},
 		// 3-1. Add a local geojson as a source in mapbox
 		addGeojsonSource(map_config, data) {
@@ -468,7 +465,7 @@ export const useMapStore = defineStore("map", {
 			) {
 				this.map.addSource(`${map_config.layerId}-source`, {
 					type: "geojson",
-					data: { ...data },
+					data: typeof data === "string" ? data : { ...data },
 				});
 			}
 			if (map_config.type === "arc") {

@@ -144,7 +144,7 @@ BEGIN
     created_at, updated_at, query_type, query_chart, query_history, city
   ) VALUES
   (
-    high_idx, NULL, ARRAY[sites_tpe_id, segs_tpe_id]::integer[], '{}'::json,
+    high_idx, NULL, NULL, '{}'::json,
     'static', NULL, 1, 'day',
     src_label, high_short, high_long, high_use, links, contributors,
     now(), now(), 'two_d',
@@ -152,7 +152,7 @@ BEGIN
     NULL, 'taipei'
   ),
   (
-    high_idx, NULL, ARRAY[sites_mtp_id, segs_mtp_id]::integer[], '{}'::json,
+    high_idx, NULL, NULL, '{}'::json,
     'static', NULL, 1, 'day',
     src_label, high_short, high_long, high_use, links, contributors,
     now(), now(), 'two_d',

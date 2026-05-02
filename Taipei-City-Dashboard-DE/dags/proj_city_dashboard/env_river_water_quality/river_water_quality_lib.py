@@ -1016,15 +1016,15 @@ def _synthesize_ext_segment_ordering(
     ``river_id = "ext-river:{basin}"`` so the basin's stations group
     together when the segment builder iterates.
 
-    Stations whose basin does not match WRA, or whose projection distance
-    exceeds :data:`STATION_OFF_RIVER_TOLERANCE_M`, retain their NA values
-    and remain points-only.
+    Stations whose basin does not match WRA are ordered by their dominant
+    coordinate axis so they can still use straight-line fallback geometry.
+    Stations whose WRA projection distance exceeds
+    :data:`STATION_OFF_RIVER_TOLERANCE_M` retain their NA values and remain
+    points-only.
     """
     if (
         latest_df is None
         or latest_df.empty
-        or wra_gdf is None
-        or len(wra_gdf) == 0
         or "source_label" not in latest_df.columns
     ):
         return latest_df
@@ -1041,8 +1041,6 @@ def _synthesize_ext_segment_ordering(
 
     basins = latest_df.loc[ext_mask, "basin"].unique().tolist()
     river_features = _index_river_features(wra_gdf, basins)
-    if not river_features:
-        return latest_df
 
     df = latest_df.copy()
     if "river_id" in df.columns and df["river_id"].dtype != object:
@@ -1069,6 +1067,27 @@ def _synthesize_ext_segment_ordering(
         projections.sort(key=lambda x: (x[1].feature_idx, x[1].t_along))
         synthetic_river_id = f"{EXT_RIVER_ID_PREFIX}:{basin_name}"
         for order, (idx, _) in enumerate(projections, 1):
+            df.at[idx, "river_id"] = synthetic_river_id
+            df.at[idx, "station_order"] = order
+
+    unmatched_basins = set(basins) - set(river_features.keys())
+    for basin_name in sorted(unmatched_basins):
+        basin_mask = ext_mask & (latest_df["basin"] == basin_name)
+        basin_indexes = latest_df.index[basin_mask].tolist()
+        if len(basin_indexes) < 2:
+            continue
+
+        basin_rows = latest_df.loc[basin_indexes].copy()
+        lon_span = basin_rows["longitude"].max() - basin_rows["longitude"].min()
+        lat_span = basin_rows["latitude"].max() - basin_rows["latitude"].min()
+        primary_axis = "latitude" if lat_span >= lon_span else "longitude"
+        secondary_axis = "longitude" if primary_axis == "latitude" else "latitude"
+        ordered_indexes = basin_rows.sort_values(
+            [primary_axis, secondary_axis, "site_id"]
+        ).index.tolist()
+
+        synthetic_river_id = f"{EXT_RIVER_ID_PREFIX}:{basin_name}"
+        for order, idx in enumerate(ordered_indexes, 1):
             df.at[idx, "river_id"] = synthetic_river_id
             df.at[idx, "station_order"] = order
 
@@ -1246,17 +1265,16 @@ def export_geojson_layers(
     else:
         metro_segment_site_ids = _connected_site_ids_from_segments(segs_metro, sites)
 
-    extra_site_ids = _ext_source_visible_site_ids(sites)
-    taipei_site_ids = taipei_segment_site_ids | extra_site_ids
-    metro_site_ids = metro_segment_site_ids | extra_site_ids
-
     _write_geojson(
-        sites[(sites["city"] == taipei) & (sites["site_id"].isin(taipei_site_ids))],
+        sites[
+            (sites["city"] == taipei)
+            & (sites["site_id"].isin(taipei_segment_site_ids))
+        ],
         _SITE_GEOJSON_PROPS,
         os.path.join(out_dir, "env_river_sites_taipei.geojson"),
     )
     _write_geojson(
-        sites[sites["site_id"].isin(metro_site_ids)],
+        sites[sites["site_id"].isin(metro_segment_site_ids)],
         _SITE_GEOJSON_PROPS,
         os.path.join(out_dir, "env_river_sites_metrotaipei.geojson"),
     )
@@ -1269,16 +1287,6 @@ def export_geojson_layers(
         _write_empty_collection(segs_metro_path)
     else:
         _write_geojson(segs_metro, _SEGMENT_GEOJSON_PROPS, segs_metro_path)
-
-
-def _ext_source_visible_site_ids(sites: gpd.GeoDataFrame) -> set:
-    if sites is None or sites.empty or "source_label" not in sites.columns:
-        return set()
-    mask = sites["source_label"] == SOURCE_LABEL_MOENV_EXT_RIVER
-    if "rpi_flag" in sites.columns:
-        mask &= sites["rpi_flag"] == RPI_FLAG_COMPLETE
-    return set(sites.loc[mask, "site_id"].astype(str))
-
 
 def _site_ids_from_segments(segs: gpd.GeoDataFrame) -> set:
     if segs is None or segs.empty:

@@ -965,7 +965,7 @@ def test_merge_normalized_frames_avoids_id_collisions_between_sources():
     }
 
 
-def test_export_geojson_includes_ext_sites_without_segments(tmp_path):
+def test_export_geojson_omits_ext_sites_without_segments(tmp_path):
     latest_gdf = gpd.GeoDataFrame(
         [
             {
@@ -1003,9 +1003,7 @@ def test_export_geojson_includes_ext_sites_without_segments(tmp_path):
     export_geojson_layers(latest_gdf, segments_gdf=None, out_dir=str(tmp_path))
 
     sites = gpd.read_file(tmp_path / "env_river_sites_taipei.geojson")
-    assert sites["site_id"].tolist() == ["ext:25:1"]
-    assert sites["do_value"].iloc[0] == 7.0
-    assert sites["rpi_method"].iloc[0] == RPI_METHOD_CALCULATED_FROM_ITEMS
+    assert sites.empty
 
 
 def _detail_html(
@@ -1275,16 +1273,20 @@ def test_build_river_segments_generates_segments_for_ext_stations_along_wra():
     assert first["downstream_rpi"] == 4.0
 
 
-def test_build_river_segments_skips_ext_basins_without_wra_match():
+def test_build_river_segments_falls_back_to_straight_lines_for_ext_basins_without_wra_match():
     latest_df = pd.DataFrame(
         [
             _ext_latest_row(
-                site_id="ext:25:11", basin="水仙溪",
-                longitude=121.394, latitude=25.083,
+                site_id="ext:25:1947", site_name="老梅溪取水口", basin="老梅溪",
+                longitude=121.552919444444441, latitude=25.261388888888888,
             ),
             _ext_latest_row(
-                site_id="ext:25:12", basin="水仙溪",
-                longitude=121.398, latitude=25.086,
+                site_id="ext:25:30", site_name="大溪墘橋", basin="老梅溪",
+                longitude=121.550638888888884, latitude=25.275061111111111,
+            ),
+            _ext_latest_row(
+                site_id="ext:25:31", site_name="二十三號橋", basin="老梅溪",
+                longitude=121.547169444444449, latitude=25.289219444444445,
             ),
         ]
     )
@@ -1295,7 +1297,15 @@ def test_build_river_segments_skips_ext_basins_without_wra_match():
     )
 
     segments = build_river_segments(latest_df, wra_gdf)
-    assert segments.empty
+    assert len(segments) == 2
+    assert segments["segment_id"].tolist() == [
+        "ext-river:老梅溪-ext:25:1947-ext:25:30",
+        "ext-river:老梅溪-ext:25:30-ext:25:31",
+    ]
+    assert segments["geometry_source"].tolist() == [
+        GEOMETRY_SOURCE_STRAIGHT_LINE,
+        GEOMETRY_SOURCE_STRAIGHT_LINE,
+    ]
 
 
 def test_build_river_segments_orders_ext_stations_by_projection_position():

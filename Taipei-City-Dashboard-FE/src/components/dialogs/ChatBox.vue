@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, nextTick } from "vue";
+import { computed, ref, watch, nextTick } from "vue";
 import { storeToRefs } from "pinia";
 import SendIcon from "../icons/SendIcon.vue";
 import BotLogo from "../icons/BotLogo.vue";
@@ -15,7 +15,7 @@ const contentStore = useContentStore();
 const authStore = useAuthStore();
 const { addChatData, addQueryData, addAiChatData, saveChatLog } = chatStore;
 const { createDashboard } = contentStore;
-const { chatData, isAiLoading } = storeToRefs(chatStore);
+const { recommendChatData, aiChatData, isAiLoading } = storeToRefs(chatStore);
 const { editDashboard } = storeToRefs(contentStore);
 const { user } = storeToRefs(authStore);
 
@@ -23,11 +23,19 @@ const userMessage = ref("");
 const chatAreaRef = ref(null);
 const isStickyOpen = ref(false);
 const dashboardCreationLoading = ref(false);
-const chatMode = ref("recommend");
+const chatModeRecommend = "recommend";
+const chatModeAi = "ai";
+const chatMode = ref(chatModeRecommend);
 const chatModes = [
-	{ value: "recommend", label: "組件推薦" },
-	{ value: "ai", label: "AI 對話" },
+	{ value: chatModeRecommend, label: "組件推薦" },
+	{ value: chatModeAi, label: "AI 對話" },
 ];
+const activeChatData = computed(() =>
+	chatMode.value === chatModeAi ? aiChatData.value : recommendChatData.value
+);
+const isInputDisabled = computed(
+	() => chatMode.value === chatModeAi && isAiLoading.value
+);
 
 const qaBtnHandler = async (text, relations) => {
 	if (text === "建立儀表板") {
@@ -69,14 +77,14 @@ const qaBtnHandler = async (text, relations) => {
 
 const sendBtnHandler = (text) => {
 	const trimmedText = text.trim();
-	if (!trimmedText || isAiLoading.value) return;
+	if (!trimmedText || isInputDisabled.value) return;
 
 	const message = {
 		role: "user",
 		content: trimmedText,
 	};
 
-	if (chatMode.value === "ai") {
+	if (chatMode.value === chatModeAi) {
 		addAiChatData(message);
 	} else {
 		addQueryData(message);
@@ -90,7 +98,7 @@ const toggleSticky = () => {
 };
 
 watch(
-	() => chatData.value.length,
+	() => [chatMode.value, activeChatData.value.length],
 	async () => {
 		await nextTick();
 		const chat = chatAreaRef.value;
@@ -132,7 +140,7 @@ watch(
         </div>
       </div>
       <div
-        v-for="chat in chatData"
+        v-for="chat in activeChatData"
         :key="chat.id"
         class="message"
       >
@@ -237,12 +245,12 @@ watch(
       <input
         v-model="userMessage"
         type="text"
-        :placeholder="isAiLoading ? 'AI 回覆中...' : '輸入訊息...'"
-        :disabled="isAiLoading"
+        :placeholder="isInputDisabled ? 'AI 回覆中...' : '輸入訊息...'"
+        :disabled="isInputDisabled"
         @keyup.enter="sendBtnHandler(userMessage)"
       >
       <button
-        :disabled="isAiLoading"
+        :disabled="isInputDisabled"
         @click="sendBtnHandler(userMessage)"
       >
         <SendIcon />

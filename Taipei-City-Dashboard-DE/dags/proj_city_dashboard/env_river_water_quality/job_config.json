@@ -1,0 +1,49 @@
+{
+  "dag_infos": {
+    "dag_id": "env_river_water_quality",
+    "start_date": "2026-05-01",
+    "schedule_interval": "0 4 * * *",
+    "catchup": false,
+    "tags": [
+      "env_river_water_quality",
+      "環境部",
+      "經濟部水利署",
+      "河川水質",
+      "RPI"
+    ],
+    "description": "Daily snapshot of MOENV river water quality stations for Taipei and New Taipei, joined with WRA river-channel polylines for gradient segments.",
+    "default_args": {
+      "owner": "airflow",
+      "email": [
+        "DEFAULT_EMAIL_LIST"
+      ],
+      "email_on_retry": false,
+      "email_on_failure": true,
+      "retries": 1,
+      "retry_delay": 60
+    },
+    "ready_data_db": "postgres_default",
+    "ready_data_default_table": [
+      "env_river_monitoring_sites",
+      "env_river_site_rpi_latest",
+      "env_river_rpi_segments_latest"
+    ],
+    "ready_data_history_table": "",
+    "raw_data_db": "postgres_default",
+    "raw_data_table": "",
+    "load_behavior": "replace"
+  },
+  "data_infos": {
+    "name_cn": "雙北河川水質 RPI 風險追蹤",
+    "airflow_update_freq": "04:00+8 daily",
+    "source": "https://wq.moenv.gov.tw/EWQP_GIS/dataFile/AJAX_Main.aspx?Type=Get_point_WQStation_River,https://gic.wra.gov.tw/gis/gic/API/Google/DownLoad.aspx?fname=RIVER&filetype=SHP",
+    "source_type": "MOENV AJAX JSON, WRA Shapefile",
+    "source_dept": "環境部,經濟部水利署",
+    "gis_format": "Point,LineString",
+    "output_coordinate": "EPSG:4326",
+    "coordinate": "EPSG:4326",
+    "is_geometry": 1,
+    "dataset_description": "由環境部水質監測 GIS 介面取得雙北河川測站、最新月份 RPI (WQ_Index) 與風險分級；以經濟部水利署河川河道圖資 (river.shp) 內插出沿真實河道的測站間漸層段。",
+    "etl_description": "拉取 MOENV AJAX JSON 與 WRA 河川河道 SHP，篩選臺北市與新北市測站，依 River_ID 將相鄰測站投影至河川中心線，使用 shapely substring 切出真實河道折線段，地圖以漸層上色；測站基本資料與最新快照同時覆寫。"
+  }
+}

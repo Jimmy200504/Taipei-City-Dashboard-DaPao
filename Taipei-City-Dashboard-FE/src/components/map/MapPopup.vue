@@ -77,7 +77,10 @@
             />
           </template>
         </div>
-        <div v-else>
+        <div
+          v-else-if="popupContent[activeTab]?.properties[item.key] !== null &&
+                     popupContent[activeTab]?.properties[item.key] !== undefined"
+        >
           <h3>{{ item.name }}</h3>
           <p>{{ popupContent[activeTab]?.properties[item.key] }}</p>
         </div>

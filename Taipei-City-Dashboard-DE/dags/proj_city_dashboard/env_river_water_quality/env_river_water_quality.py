@@ -16,6 +16,7 @@ def _env_river_water_quality(**kwargs):
 
     from proj_city_dashboard.env_river_water_quality.river_water_quality_lib import (
         build_river_segments,
+        export_geojson_layers,
         fetch_river_station_records,
         fetch_wra_river_geodataframe,
         normalize_records,
@@ -86,6 +87,8 @@ def _env_river_water_quality(**kwargs):
         latest_gdf.to_postgis(latest_table, conn, if_exists="append", index=False)
         if segments_gdf is not None:
             segments_gdf.to_postgis(segments_table, conn, if_exists="append", index=False)
+
+    export_geojson_layers(latest_gdf, segments_gdf)
 
     sample_months = pd.to_datetime(latest_df["sample_month"], errors="coerce")
     lasttime_in_data = sample_months.max() if not sample_months.dropna().empty else data_time

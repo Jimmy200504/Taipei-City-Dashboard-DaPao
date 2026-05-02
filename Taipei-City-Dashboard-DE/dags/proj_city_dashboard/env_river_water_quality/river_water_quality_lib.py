@@ -1,3 +1,4 @@
+import json
 import logging
 import math
 import os
@@ -410,6 +411,106 @@ def build_river_segments(
     return pd.DataFrame(rows, columns=_SEGMENT_COLUMNS).drop_duplicates(
         subset=["segment_id"], keep="first"
     )
+
+
+_SITE_GEOJSON_PROPS = [
+    "site_id",
+    "site_name",
+    "city",
+    "district",
+    "basin",
+    "river",
+    "wq_std_grade",
+    "sample_month",
+    "rpi_value",
+    "risk_level",
+    "rpi_flag",
+    "source_name",
+    "data_time",
+]
+
+_SEGMENT_GEOJSON_PROPS = [
+    "segment_id",
+    "river_id",
+    "river",
+    "basin",
+    "upstream_site_id",
+    "upstream_site_name",
+    "upstream_city",
+    "upstream_rpi",
+    "downstream_site_id",
+    "downstream_site_name",
+    "downstream_city",
+    "downstream_rpi",
+    "sample_month",
+    "geometry_source",
+    "data_time",
+]
+
+
+def export_geojson_layers(
+    latest_gdf: gpd.GeoDataFrame,
+    segments_gdf: Optional[gpd.GeoDataFrame],
+    out_dir: str = "/opt/airflow/fe_mapData",
+) -> None:
+    os.makedirs(out_dir, exist_ok=True)
+    taipei = TARGET_CITIES[0]
+
+    sites = latest_gdf[latest_gdf["wkb_geometry"].notna()].copy()
+    sites["sample_month"] = sites["sample_month"].map(_iso_or_none)
+
+    _write_geojson(
+        sites[sites["city"] == taipei],
+        _SITE_GEOJSON_PROPS,
+        os.path.join(out_dir, "env_river_sites_taipei.geojson"),
+    )
+    _write_geojson(
+        sites,
+        _SITE_GEOJSON_PROPS,
+        os.path.join(out_dir, "env_river_sites_metrotaipei.geojson"),
+    )
+
+    segs_taipei_path = os.path.join(out_dir, "env_river_segments_taipei.geojson")
+    segs_metro_path = os.path.join(out_dir, "env_river_segments_metrotaipei.geojson")
+    if segments_gdf is None or segments_gdf.empty:
+        _write_empty_collection(segs_taipei_path)
+        _write_empty_collection(segs_metro_path)
+        return
+
+    segs = segments_gdf[segments_gdf["wkb_geometry"].notna()].copy()
+    segs["sample_month"] = segs["sample_month"].map(_iso_or_none)
+
+    segs_taipei = segs[
+        (segs["upstream_city"] == taipei) & (segs["downstream_city"] == taipei)
+    ]
+    _write_geojson(segs_taipei, _SEGMENT_GEOJSON_PROPS, segs_taipei_path)
+    _write_geojson(segs, _SEGMENT_GEOJSON_PROPS, segs_metro_path)
+
+
+def _iso_or_none(value):
+    if pd.isna(value):
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
+
+
+def _write_geojson(gdf: gpd.GeoDataFrame, props: List[str], path: str) -> None:
+    if gdf is None or gdf.empty:
+        _write_empty_collection(path)
+        return
+    cols = [c for c in props if c in gdf.columns]
+    out = gpd.GeoDataFrame(
+        gdf[cols + ["wkb_geometry"]].rename(columns={"wkb_geometry": "geometry"}),
+        geometry="geometry",
+        crs="EPSG:4326",
+    )
+    out.to_file(path, driver="GeoJSON")
+
+
+def _write_empty_collection(path: str) -> None:
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump({"type": "FeatureCollection", "features": []}, fh, ensure_ascii=False)
 
 
 def _segment_row(river_id, river_name, upstream, downstream, geom, source) -> dict:

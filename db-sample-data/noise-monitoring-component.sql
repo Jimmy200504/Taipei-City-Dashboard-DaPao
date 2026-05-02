@@ -6,16 +6,14 @@
 -- Prerequisites:
 --   1. env_noise_stations, env_noise_monthly_measurements, env_noise_quarterly_stats_tpe,
 --      env_noise_district_summary_tpe must exist in dashboard_data (postgres_default).
---   2. Confirm the component_maps.id values assigned below don't conflict with
---      existing rows — adjust if needed (max existing id was ~101 in demo data).
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
 -- 1. component_maps  (map layer styling for station points)
+--    id is auto-assigned by sequence; no hardcoded value to avoid conflicts.
 -- ---------------------------------------------------------------------------
-INSERT INTO public.component_maps (id, index, title, type, source, size, icon, paint, property)
-VALUES (
-    200,
+INSERT INTO public.component_maps (index, title, type, source, size, icon, paint, property)
+SELECT
     'env_noise_monitoring',
     '噪音測站',
     'circle',
@@ -55,8 +53,9 @@ VALUES (
         {"key": "data_time",             "name": "資料時間"},
         {"key": "source_name",           "name": "資料來源"}
     ]'
-)
-ON CONFLICT (id) DO NOTHING;
+WHERE NOT EXISTS (
+    SELECT 1 FROM public.component_maps WHERE index = 'env_noise_monitoring'
+);
 
 
 -- ---------------------------------------------------------------------------
@@ -288,7 +287,7 @@ INSERT INTO public.query_charts (
 )
 VALUES (
     'env_noise_monitoring',
-    NULL, '{200}', '{}',
+    NULL, ARRAY[(SELECT id FROM public.component_maps WHERE index = 'env_noise_monitoring')], '{}',
     'static', NULL, 1, 'month',
     '臺北市環境保護局',
     '臺北市噪音測站分佈',
@@ -356,7 +355,7 @@ INSERT INTO public.query_charts (
 )
 VALUES (
     'env_noise_monitoring',
-    NULL, '{200}', '{}',
+    NULL, ARRAY[(SELECT id FROM public.component_maps WHERE index = 'env_noise_monitoring')], '{}',
     'static', NULL, 1, 'month',
     '臺北市環境保護局 / 新北市環境保護局',
     '雙北噪音測站分佈',

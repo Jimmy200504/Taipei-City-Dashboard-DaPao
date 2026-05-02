@@ -1,0 +1,37 @@
+{
+  "dag_infos": {
+    "dag_id": "streetlight_watt_tpe",
+    "start_date": "2026-05-01",
+    "schedule_interval": "0 2 * * 1",
+    "catchup": false,
+    "tags": ["streetlight", "watt", "energy", "臺北市路燈"],
+    "description": "Weekly ETL for Taipei City street light locations and watt data.",
+    "default_args": {
+      "owner": "airflow",
+      "email": ["DEFAULT_EMAIL_LIST"],
+      "email_on_retry": false,
+      "email_on_failure": true,
+      "retries": 1,
+      "retry_delay": 60
+    },
+    "ready_data_db": "postgres_default",
+    "ready_data_default_table": "env_streetlight_assets_tpe",
+    "ready_data_history_table": "",
+    "raw_data_db": "postgres_default",
+    "raw_data_table": "",
+    "load_behavior": "replace"
+  },
+  "data_infos": {
+    "name_cn": "臺北市路燈位置與瓦數",
+    "airflow_update_freq": "02:00+8 每週一",
+    "source": "https://tppkl.blob.core.windows.net/blobfs/TaipeiLight.json",
+    "source_type": "static json",
+    "source_dept": "臺北市工務局",
+    "gis_format": "Point",
+    "output_coordinate": "EPSG:4326",
+    "is_geometry": 1,
+    "dataset_description": "臺北市路燈點位分布，含行政區、燈種、燈桿總瓦數、燈桿高度與裝設年分。一根燈桿一筆記錄，瓦數為所有燈具加總。",
+    "etl_description": "下載靜態 JSON，計算燈桿總瓦數（單種燈具乘數量；多種加總），TWD97 轉 WGS84，依瓦數分級，寫入 PostgreSQL。",
+    "sensitivity": "public"
+  }
+}

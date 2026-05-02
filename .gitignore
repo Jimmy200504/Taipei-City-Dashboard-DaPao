@@ -74,3 +74,7 @@ Taipei-City-Dashboard-DE/docker/prod/.env
 
 *.env
 AGENTS.md
+
+# generated GeoJSON map data (large files, regenerate via generate_geojson.py after ETL)
+Taipei-City-Dashboard-FE/public/mapData/streetlight_watt_tpe.geojson
+Taipei-City-Dashboard-FE/public/mapData/streetlight_watt_metrotaipei.geojson

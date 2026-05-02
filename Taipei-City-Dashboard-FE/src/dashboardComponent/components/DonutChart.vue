@@ -3,6 +3,10 @@
 <script setup>
 import { computed, ref } from "vue";
 import VueApexCharts from "vue3-apexcharts";
+import {
+	formatRiverRiskLevel,
+	getRiverRiskLevelDetail,
+} from "../../assets/utilityFunctions/riverWaterQualityFormat.js";
 
 const props = defineProps([
 	"chart_config",
@@ -42,6 +46,18 @@ const parsedSeries = computed(() => {
 	return output;
 });
 const parsedLabels = computed(() => {
+	const toParse = [...props.series[0].data];
+	if (toParse.length <= steps.value) {
+		return toParse.map((item) => formatRiverRiskLevel(item.x));
+	}
+	let output = [];
+	for (let i = 0; i < steps.value; i++) {
+		output.push(formatRiverRiskLevel(toParse[i].x));
+	}
+	output.push("其他");
+	return output;
+});
+const rawLabels = computed(() => {
 	const toParse = [...props.series[0].data];
 	if (toParse.length <= steps.value) {
 		return toParse.map((item) => item.x);
@@ -99,13 +115,12 @@ const chartOptions = ref({
 		custom: function ({
 			series,
 			seriesIndex,
-			w,
 		}) {
 			// The class "chart-tooltip" could be edited in /assets/styles/chartStyles.css
 			return (
 				'<div class="chart-tooltip">' +
 				"<h6>" +
-				w.globals.labels[seriesIndex] +
+				getRiverRiskLevelDetail(rawLabels.value[seriesIndex]) +
 				"</h6>" +
 				"<span>" +
 				series[seriesIndex] +
@@ -132,7 +147,7 @@ function handleDataSelection(_e, _chartContext, config) {
 				"filterByParam",
 				props.map_filter,
 				props.map_config,
-				config.w.globals.labels[config.dataPointIndex],
+				rawLabels.value[config.dataPointIndex],
 				null
 			);
 		}
@@ -141,7 +156,7 @@ function handleDataSelection(_e, _chartContext, config) {
 			emits(
 				"filterByLayer",
 				props.map_config,
-				config.w.globals.labels[config.dataPointIndex]
+				rawLabels.value[config.dataPointIndex]
 			);
 		}
 		selectedIndex.value = `${config.dataPointIndex}-${config.seriesIndex}`;

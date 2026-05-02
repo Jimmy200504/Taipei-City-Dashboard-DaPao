@@ -57,6 +57,7 @@ import {
 	getCrowdColor,
 	mrtLineColor,
 } from "../assets/utilityFunctions/getThematicColor.js";
+import { formatRiverPopupValue } from "../assets/utilityFunctions/riverWaterQualityFormat.js";
 
 const riverRpiColorStops = [
 	1,
@@ -2089,7 +2090,7 @@ export const useMapStore = defineStore("map", {
 				if (key === "occupied_rate") {
 					return value === -99 ? "-" : value;
 				}
-				return value;
+				return formatRiverPopupValue(key, value);
 			};
 
 			const hitSize = 6;

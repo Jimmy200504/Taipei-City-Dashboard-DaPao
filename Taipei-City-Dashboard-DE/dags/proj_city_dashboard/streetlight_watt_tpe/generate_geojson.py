@@ -4,24 +4,23 @@ Manual script: generate GeoJSON map files for the streetlight dashboard.
 Run AFTER both TPE and NTPE ETL DAGs have completed successfully.
 
 Usage (inside airflow-worker container):
-    python -c "
-    import sys; sys.path.insert(0, '/opt/airflow/dags/proj_city_dashboard/streetlight_watt_tpe')
-    from pathlib import Path
-    import generate_geojson
-    generate_geojson.generate(
-        'postgresql://postgres:0410@postgres-data:5432/dashboard',
-        Path('/tmp/mapData')
-    )
-    "
+    docker exec develop-airflow-worker-default-1 python \\
+        /opt/airflow/dags/proj_city_dashboard/streetlight_watt_tpe/generate_geojson.py
 
 Then copy to FE:
     docker cp develop-airflow-worker-default-1:/tmp/mapData/streetlight_watt_tpe.geojson \\
         Taipei-City-Dashboard-FE/public/mapData/
     docker cp develop-airflow-worker-default-1:/tmp/mapData/streetlight_watt_metrotaipei.geojson \\
         Taipei-City-Dashboard-FE/public/mapData/
+
+DB connection reads from environment variables:
+    DB_DASHBOARD_HOST, DB_DASHBOARD_PORT, DB_DASHBOARD_USER,
+    DB_DASHBOARD_PASSWORD, DB_DASHBOARD_DBNAME
+(set in Taipei-City-Dashboard-DE/docker/develop/.env)
 """
 
 import json
+import os
 from pathlib import Path
 
 from sqlalchemy import create_engine, text
@@ -107,8 +106,14 @@ def generate(db_uri: str, out_dir: Path):
         )
 
 
+def _db_uri_from_env() -> str:
+    host = os.environ.get("DB_DASHBOARD_HOST", "postgres-data")
+    port = os.environ.get("DB_DASHBOARD_PORT", "5432")
+    user = os.environ.get("DB_DASHBOARD_USER", "postgres")
+    password = os.environ.get("DB_DASHBOARD_PASSWORD", "")
+    dbname = os.environ.get("DB_DASHBOARD_DBNAME", "dashboard")
+    return f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
+
+
 if __name__ == "__main__":
-    generate(
-        "postgresql://postgres:0410@postgres-data:5432/dashboard",
-        Path("/tmp/mapData"),
-    )
+    generate(_db_uri_from_env(), Path("/tmp/mapData"))

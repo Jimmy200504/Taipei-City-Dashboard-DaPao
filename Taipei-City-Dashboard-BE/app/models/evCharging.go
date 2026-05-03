@@ -15,7 +15,10 @@ type EVChargingStation struct {
 	Spaces             *int            `gorm:"column:spaces"               json:"spaces"`
 	ChargingPointCount *int            `gorm:"column:charging_point_count" json:"charging_point_count"`
 	ConnectorCount     *int            `gorm:"column:connector_count"      json:"connector_count"`
+	MaxPowerKw         *float64        `gorm:"column:max_power_kw"         json:"max_power_kw"`
+	MaxPowerBucket     string          `gorm:"column:max_power_bucket"     json:"max_power_bucket"`
 	PowerSummary       json.RawMessage `gorm:"column:power_summary"        json:"power_summary"`
+	PowerDetail        json.RawMessage `gorm:"column:power_detail"         json:"power_detail"`
 	ServiceTime        string          `gorm:"column:service_time"         json:"service_time"`
 	ParkingRate        string          `gorm:"column:parking_rate"         json:"parking_rate"`
 	ChargingRate       string          `gorm:"column:charging_rate"        json:"charging_rate"`
@@ -43,7 +46,10 @@ func GetEVChargingStations(cityScope string) ([]EVChargingStation, error) {
 			spaces,
 			charging_point_count,
 			connector_count,
+			max_power_kw,
+			max_power_bucket,
 			power_summary,
+			power_detail,
 			service_time,
 			parking_rate,
 			charging_rate,

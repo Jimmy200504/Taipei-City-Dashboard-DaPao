@@ -655,20 +655,9 @@ export const useMapStore = defineStore("map", {
 			const cityScope = map_config.index.endsWith("metrotaipei")
 				? "twin_city"
 				: "taipei";
-			const bucketLabels = {
-				slow_ac: "慢充",
-				medium_dc: "中速快充",
-				fast_dc: "快充",
-				ultra_fast_dc: "急速快充",
-				unknown: "未知",
-			};
-			const bucketOrder = ["slow_ac", "medium_dc", "fast_dc", "ultra_fast_dc", "unknown"];
-			const formatPowerSummary = (summary) => {
-				if (!summary || typeof summary !== "object") return "—";
-				const parts = bucketOrder
-					.filter((k) => summary[k])
-					.map((k) => `${bucketLabels[k]} ${summary[k]}`);
-				return parts.length ? parts.join(" / ") : "—";
+				const formatPowerDetail = (detail) => {
+				if (!Array.isArray(detail) || !detail.length) return "—";
+				return detail.map((d) => `${d.kw}kW ×${d.count}`).join(" / ");
 			};
 			const formatDataTime = (t) => {
 				if (!t) return "—";
@@ -711,13 +700,19 @@ export const useMapStore = defineStore("map", {
 								geometry: s.geometry,
 								properties: {
 									station_name:         s.station_name || "—",
+									city:                 s.city || "—",
+									district:             s.district || "—",
+									address:              s.address || "—",
+									operator_id:          s.operator_id || "—",
 									spaces:               s.spaces ?? "—",
 									charging_point_count: s.charging_point_count ?? "—",
 									connector_count:      s.connector_count ?? "—",
+									max_power_kw:         s.max_power_kw != null ? `${s.max_power_kw} kW` : "—",
+									max_power_bucket:     s.max_power_bucket || "unknown",
+									power_detail:         formatPowerDetail(s.power_detail),
 									service_time:         normalizeServiceTime(s.service_time),
 									parking_rate:         s.parking_rate || "—",
 									charging_rate:        s.charging_rate || "—",
-									power_summary:        formatPowerSummary(s.power_summary),
 									data_time:            formatDataTime(s.data_time),
 								},
 							})),

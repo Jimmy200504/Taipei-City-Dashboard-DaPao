@@ -35,14 +35,14 @@ WHERE NOT EXISTS (SELECT 1 FROM public.contributors WHERE user_id = 'TtouTsai');
 -- component_maps (index has no unique constraint, use WHERE NOT EXISTS)
 INSERT INTO public.component_maps (index, title, type, source, size, icon, paint, property)
 SELECT 'ev_charging_stations_tpe', '充電站', 'circle', 'api', NULL, NULL,
-  '{"circle-color":"#4CAF50","circle-radius":6,"circle-stroke-width":1.5,"circle-stroke-color":"#fff","circle-opacity":0.9}',
-  '[{"key":"station_name","name":"站名"},{"key":"spaces","name":"充電車位數"},{"key":"charging_point_count","name":"充電樁數"},{"key":"connector_count","name":"充電槍數"},{"key":"service_time","name":"服務時間"},{"key":"parking_rate","name":"停車費率"},{"key":"charging_rate","name":"充電費率"},{"key":"power_summary","name":"充電槍功率摘要"},{"key":"data_time","name":"資料時間"}]'
+  '{"circle-color":["match",["get","max_power_bucket"],"slow_ac","#81C784","medium_dc","#FFB74D","fast_dc","#E57373","ultra_fast_dc","#AB47BC","#9E9E9E"],"circle-radius":6,"circle-stroke-width":1.5,"circle-stroke-color":"#fff","circle-opacity":0.9}',
+  '[{"key":"station_name","name":"站名"},{"key":"city","name":"城市"},{"key":"district","name":"行政區"},{"key":"address","name":"地址"},{"key":"operator_id","name":"營運業者"},{"key":"spaces","name":"充電車位數"},{"key":"charging_point_count","name":"充電樁數"},{"key":"connector_count","name":"充電槍數"},{"key":"max_power_kw","name":"最高功率 (kW)"},{"key":"max_power_bucket","name":"功率等級"},{"key":"power_detail","name":"功率明細"},{"key":"service_time","name":"服務時間"},{"key":"parking_rate","name":"停車費率"},{"key":"charging_rate","name":"充電費率"},{"key":"data_time","name":"資料時間"}]'
 WHERE NOT EXISTS (SELECT 1 FROM public.component_maps WHERE index = 'ev_charging_stations_tpe');
 
 INSERT INTO public.component_maps (index, title, type, source, size, icon, paint, property)
 SELECT 'ev_charging_stations_metrotaipei', '充電站', 'circle', 'api', NULL, NULL,
-  '{"circle-color":"#4CAF50","circle-radius":6,"circle-stroke-width":1.5,"circle-stroke-color":"#fff","circle-opacity":0.9}',
-  '[{"key":"station_name","name":"站名"},{"key":"spaces","name":"充電車位數"},{"key":"charging_point_count","name":"充電樁數"},{"key":"connector_count","name":"充電槍數"},{"key":"service_time","name":"服務時間"},{"key":"parking_rate","name":"停車費率"},{"key":"charging_rate","name":"充電費率"},{"key":"power_summary","name":"充電槍功率摘要"},{"key":"data_time","name":"資料時間"}]'
+  '{"circle-color":["match",["get","max_power_bucket"],"slow_ac","#81C784","medium_dc","#FFB74D","fast_dc","#E57373","ultra_fast_dc","#AB47BC","#9E9E9E"],"circle-radius":6,"circle-stroke-width":1.5,"circle-stroke-color":"#fff","circle-opacity":0.9}',
+  '[{"key":"station_name","name":"站名"},{"key":"city","name":"城市"},{"key":"district","name":"行政區"},{"key":"address","name":"地址"},{"key":"operator_id","name":"營運業者"},{"key":"spaces","name":"充電車位數"},{"key":"charging_point_count","name":"充電樁數"},{"key":"connector_count","name":"充電槍數"},{"key":"max_power_kw","name":"最高功率 (kW)"},{"key":"max_power_bucket","name":"功率等級"},{"key":"power_detail","name":"功率明細"},{"key":"service_time","name":"服務時間"},{"key":"parking_rate","name":"停車費率"},{"key":"charging_rate","name":"充電費率"},{"key":"data_time","name":"資料時間"}]'
 WHERE NOT EXISTS (SELECT 1 FROM public.component_maps WHERE index = 'ev_charging_stations_metrotaipei');
 
 -- Repair existing query_charts rows when component_maps were inserted with new sequence IDs.

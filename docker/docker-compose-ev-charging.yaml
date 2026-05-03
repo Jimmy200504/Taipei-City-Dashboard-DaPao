@@ -1,0 +1,33 @@
+version: "3.7"
+
+# One-off service: load EV charging JSON data into the dashboard DB.
+#
+# Usage (from project root):
+#   docker compose --env-file docker/.env -f docker/docker-compose-ev-charging.yaml up --build
+#
+# Prerequisites:
+#   1. docker/.env is populated (copy from docker/.env.template)
+#   2. postgres-data container is running (docker compose -f docker/docker-compose-db.yaml up -d)
+#   3. Dashboard DB has been initialised (docker compose -f docker/docker-compose-init.yaml up)
+#      so that tp_district and tw_village geometry tables exist for spatial join.
+
+services:
+  ev-charging-loader:
+    image: python:3.11-slim
+    container_name: ev-charging-loader
+    environment:
+      DB_DASHBOARD_HOST: ${DB_DASHBOARD_HOST:-postgres-data}
+      DB_DASHBOARD_USER: ${DB_DASHBOARD_USER}
+      DB_DASHBOARD_PASSWORD: ${DB_DASHBOARD_PASSWORD}
+      DB_DASHBOARD_DBNAME: ${DB_DASHBOARD_DBNAME:-dashboard}
+      DB_DASHBOARD_PORT: ${DB_DASHBOARD_PORT:-5432}
+    volumes:
+      - ../db-sample-data:/opt/db-sample-data
+    working_dir: /opt/db-sample-data/car
+    command: >
+      sh -c "pip install -r requirements.txt -q && python load_ev_charging.py"
+
+networks:
+  default:
+    name: br_dashboard
+    external: true

@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"TaipeiCityDashboardBE/app/models"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -13,22 +12,38 @@ import (
 // ToolFunc defines the signature for a tool function
 type ToolFunc func(ctx context.Context, args string) (string, error)
 
-const (
-	ToolGetCurrentTime       = "get_current_time"
-	ToolGetPopulationSummary = "get_population_summary"
+const ToolGetCurrentTime = "get_current_time"
+
+var (
+	registry            = make(map[string]ToolFunc)
+	definitionsRegistry []llms.Tool
 )
 
-var registry = make(map[string]ToolFunc)
-
 func init() {
-	// Register demo tools
 	Register(ToolGetCurrentTime, GetCurrentTime)
-	Register(ToolGetPopulationSummary, GetPopulationSummary)
+	RegisterDefinition(llms.Tool{
+		Type: "function",
+		Function: &llms.FunctionDefinition{
+			Name:        ToolGetCurrentTime,
+			Description: "取得目前台北時間。",
+			Parameters: map[string]interface{}{
+				"type":                 "object",
+				"properties":           map[string]interface{}{},
+				"additionalProperties": false,
+			},
+		},
+	})
 }
 
-// Register adds a tool to the registry
+// Register adds a tool function to the registry
 func Register(name string, fn ToolFunc) {
 	registry[name] = fn
+}
+
+// RegisterDefinition adds a tool schema to the definitions registry.
+// Call from each tool file's init() alongside Register().
+func RegisterDefinition(tool llms.Tool) {
+	definitionsRegistry = append(definitionsRegistry, tool)
 }
 
 // Execute calls a registered tool with the given arguments
@@ -40,107 +55,21 @@ func Execute(ctx context.Context, name string, args string) (string, error) {
 	return fn(ctx, args)
 }
 
-// Definitions returns the server-owned tools that may be exposed to the model.
+// Definitions returns all registered tool schemas to expose to the model
 func Definitions() []llms.Tool {
-	return []llms.Tool{
-		{
-			Type: "function",
-			Function: &llms.FunctionDefinition{
-				Name:        ToolGetCurrentTime,
-				Description: "取得目前台北時間。",
-				Parameters: map[string]interface{}{
-					"type":                 "object",
-					"properties":           map[string]interface{}{},
-					"additionalProperties": false,
-				},
-			},
-		},
-		{
-			Type: "function",
-			Function: &llms.FunctionDefinition{
-				Name:        ToolGetPopulationSummary,
-				Description: "查詢台北市或新北市指定年份的人口結構摘要。",
-				Parameters: map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"city": map[string]interface{}{
-							"type":        "string",
-							"description": "城市代碼。台北市使用 taipei，新北市使用 new_taipei。",
-							"enum":        []string{"taipei", "new_taipei"},
-						},
-						"year": map[string]interface{}{
-							"type":        "integer",
-							"description": "西元年份。",
-						},
-					},
-					"required":             []string{"city", "year"},
-					"additionalProperties": false,
-				},
-			},
-		},
-	}
+	return definitionsRegistry
 }
 
-// PopulationArgs defines the arguments for the get_population_summary tool
-type PopulationArgs struct {
-	City string `json:"city"`
-	Year int    `json:"year"`
-}
-
-// GetPopulationSummary queries the population age distribution from the dashboard database
-func GetPopulationSummary(ctx context.Context, args string) (string, error) {
-	var params PopulationArgs
-	if err := parseArgs(args, &params); err != nil {
-		return "", fmt.Errorf("invalid arguments: %v", err)
-	}
-
-	// Default to Taipei if not specified or unrecognized
-	tableName := "population_age_distribution_tpe"
-	cityName := "台北市"
-	if params.City == "new_taipei" {
-		tableName = "population_age_distribution_new_tpe"
-		cityName = "新北市"
-	}
-
-	// Define result structure based on database schema
-	var result struct {
-		Year     int       `gorm:"column:year"`
-		Young    int       `gorm:"column:young_population"`
-		Working  int       `gorm:"column:working_age_population"`
-		Elderly  int       `gorm:"column:elderly_population"`
-		DataTime time.Time `gorm:"column:data_time"`
-	}
-
-	// Query the dashboard database
-	err := models.DBDashboard.Table(tableName).
-		Where("year = ?", params.Year).
-		Order("data_time DESC"). // Get the latest record for that year
-		First(&result).Error
-
-	if err != nil {
-		return "", fmt.Errorf("找不到 %s %d 年的人口統計資料: %v", cityName, params.Year, err)
-	}
-
-	// Format the response for the LLM
-	return fmt.Sprintf(
-		"【%d年 %s 人口結構概況】\n- 幼年人口 (0-14歲)：%d 人\n- 青壯年人口 (15-64歲)：%d 人\n- 老年人口 (65歲以上)：%d 人\n- 總人口： %d 人\n- 數據更新時間：%s",
-		result.Year, cityName, result.Young, result.Working, result.Elderly,
-		result.Young+result.Working+result.Elderly,
-		result.DataTime.Format("2006-01-02"),
-	), nil
-}
-
-// GetCurrentTime is a demo tool that returns the current Taipei time
+// GetCurrentTime returns the current time in Asia/Taipei timezone
 func GetCurrentTime(ctx context.Context, args string) (string, error) {
 	loc, err := time.LoadLocation("Asia/Taipei")
 	if err != nil {
-		// Fallback to UTC if timezone data is missing
 		return time.Now().Format(time.RFC3339), nil
 	}
 	return time.Now().In(loc).Format("2006-01-02 15:04:05"), nil
 }
 
-// Helper to parse JSON arguments if needed in future tools
+// parseArgs unmarshals JSON tool arguments into a struct
 func parseArgs(args string, v interface{}) error {
 	return json.Unmarshal([]byte(args), v)
 }

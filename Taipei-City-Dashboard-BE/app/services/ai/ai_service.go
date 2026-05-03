@@ -176,27 +176,32 @@ func (s *aiSession) executeTools(ctx context.Context, toolCalls []llms.ToolCall)
 func (s *aiSession) injectInstructions() {
 	toolNames := ""
 	for i, t := range s.callOpts.Tools {
-		if i > 0 { toolNames += ", " }
+		if i > 0 {
+			toolNames += ", "
+		}
 		toolNames += t.Function.Name
 	}
 
-	instruction := fmt.Sprintf("\nSystem Instruction:\n1. Use ONLY: [%s].\n2. NEVER nest tool calls \n3. Arguments MUST be literal values (strings, integers, etc.), never function calls \n4. For dependent tasks, call tools sequentially in separate turns.\n5. If stuck, respond with text.", toolNames)
-	
+	sysContent := tools.SystemContext() + fmt.Sprintf(
+		"\nSystem Instruction:\n1. Use ONLY: [%s].\n2. NEVER nest tool calls.\n3. Arguments MUST be literal values (strings, integers, etc.), never function calls.\n4. For dependent tasks, call tools sequentially in separate turns.\n5. If stuck, respond with text.",
+		toolNames,
+	)
+
 	s.currentMessages = make([]llms.MessageContent, 0)
 	merged := false
 	for _, m := range s.req.Messages {
 		if m.Role == llms.ChatMessageTypeSystem && !merged {
-			s.currentMessages = append(s.currentMessages, mergeSystemMsg(m, instruction))
+			s.currentMessages = append(s.currentMessages, mergeSystemMsg(m, "\n\n"+sysContent))
 			merged = true
 		} else {
 			s.currentMessages = append(s.currentMessages, m)
 		}
 	}
-	
+
 	if !merged {
 		s.currentMessages = append([]llms.MessageContent{{
-			Role: llms.ChatMessageTypeSystem,
-			Parts: []llms.ContentPart{llms.TextContent{Text: "Instruction: Use tools: [" + toolNames + "]."}},
+			Role:  llms.ChatMessageTypeSystem,
+			Parts: []llms.ContentPart{llms.TextContent{Text: sysContent}},
 		}}, s.currentMessages...)
 	}
 }

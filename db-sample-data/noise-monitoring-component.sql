@@ -57,6 +57,52 @@ WHERE NOT EXISTS (
     SELECT 1 FROM public.component_maps WHERE index = 'env_noise_monitoring'
 );
 
+-- Metro (雙北) map layer — same paint, different index
+INSERT INTO public.component_maps (index, title, type, source, size, icon, paint, property)
+SELECT
+    'env_noise_monitoring_metro',
+    '噪音測站（雙北）',
+    'circle',
+    'geojson',
+    NULL,
+    NULL,
+    '{
+        "circle-color": [
+            "step", ["get", "latest_day_db"],
+            "#4CAF50",
+            55, "#CDDC39",
+            65, "#FFEB3B",
+            70, "#FF9800",
+            75, "#F44336"
+        ],
+        "circle-radius": 6,
+        "circle-opacity": 0.85
+    }',
+    '[
+        {"key": "station_name",          "name": "測站名稱"},
+        {"key": "city",                  "name": "城市"},
+        {"key": "district",              "name": "行政區"},
+        {"key": "station_id",            "name": "測站編號"},
+        {"key": "noise_category",        "name": "噪音類別"},
+        {"key": "monitoring_type",       "name": "監測方式"},
+        {"key": "control_zone",          "name": "管制區別"},
+        {"key": "standard_day_db",       "name": "日間管制標準(dB)"},
+        {"key": "standard_evening_db",   "name": "晚間管制標準(dB)"},
+        {"key": "standard_night_db",     "name": "夜間管制標準(dB)"},
+        {"key": "latest_day_db",         "name": "最新日間(dB)"},
+        {"key": "latest_evening_db",     "name": "最新晚間(dB)"},
+        {"key": "latest_night_db",       "name": "最新夜間(dB)"},
+        {"key": "exceeded_standard",     "name": "是否超標"},
+        {"key": "total_exceed_count",    "name": "歷年超標次數"},
+        {"key": "measurement_year",      "name": "量測年份"},
+        {"key": "measurement_month",     "name": "量測月份"},
+        {"key": "data_time",             "name": "資料時間"},
+        {"key": "source_name",           "name": "資料來源"}
+    ]'
+WHERE NOT EXISTS (
+    SELECT 1 FROM public.component_maps WHERE index = 'env_noise_monitoring_metro'
+);
+
 
 -- ---------------------------------------------------------------------------
 -- 2. components

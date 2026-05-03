@@ -30,7 +30,7 @@ Backend documentation for Taipei City Dashboard, covering Go service architectur
 | [AI Chat and Chatlog Services](taipei-dashboard-backend/ai-chat-and-chatlog-services.md) | Documents TWCC chat API parameters, streaming/tool-calling runtime, environment variables, AI logs, and chatlog session APIs. | 2026-04-24 |
 | [Operations APIs](taipei-dashboard-backend/operations-apis.md) | Summarizes contributor, issue, and viewpoint APIs with permissions and related operational table rules. | 2026-04-24 |
 | [Backend Coding Standards](taipei-dashboard-backend/backend-coding-standards.md) | Records backend Go linting, naming, file structure, and responsibility-placement conventions. | 2026-04-24 |
-| [Noise Monitoring Backend Component](taipei-dashboard-backend/noise-monitoring-component.md) | Documents the four SQL queries (timeline, heatmap, exceed-rate, map layer), component_maps config, and AI Chat tool interface for the noise monitoring component. | 2026-05-02 |
+| [Noise Monitoring Backend Component](taipei-dashboard-backend/noise-monitoring-component.md) | Documents the four SQL queries (city-split tables, UNION ALL for metro), static GeoJSON map layer, 4 AI Chat tools, and deployment steps for the noise monitoring component. | 2026-05-03 |
 
 ## taipei-dashboard-dataend
 
@@ -44,4 +44,4 @@ Data-end documentation for Taipei City Dashboard, covering Airflow orchestration
 | [Data Tables and Metadata](taipei-dashboard-dataend/data-tables-and-metadata.md) | Documents standard data-end table fields, `dataset_info`, load behaviors, table SQL generation, and source metadata conventions. | 2026-04-24 |
 | [Data-End Utility Functions](taipei-dashboard-dataend/data-end-utility-functions.md) | Catalogs extraction, time, spatial, address, load, table-SQL, and TDX authentication utilities under `/dags/utils`. | 2026-04-24 |
 | [Data-End Coding Standards](taipei-dashboard-dataend/data-end-coding-standards.md) | Records data-end Python style rules, linting/formatting expectations, naming conventions, and Airflow-specific code placement notes. | 2026-04-24 |
-| [Noise Monitoring ETL Pipeline](taipei-dashboard-dataend/noise-monitoring-etl.md) | Covers data sources (Taipei HTML scraping, New Taipei PDF parsing), four table schemas, three DAGs, geocoding strategy, special symbol handling, and ETL difficulty points. | 2026-05-02 |
+| [Noise Monitoring ETL Pipeline](taipei-dashboard-dataend/noise-monitoring-etl.md) | Covers data sources (Taipei HTML scraping, New Taipei PDF parsing), city-split table schemas, three DAGs, geocoding strategy, symbol handling, deployment commands, and verification queries. | 2026-05-03 |

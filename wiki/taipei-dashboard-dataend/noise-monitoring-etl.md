@@ -1,7 +1,7 @@
 # Noise Monitoring ETL Pipeline
 
-> Sources: 臺北市環保局 / 新北市環保局規格文件, 2026-05-02
-> Raw: [噪音監測與分佈](../../raw/taipei-dashboard-dataend/噪音監測與分佈.md)
+> Sources: 臺北市環保局 / 新北市環保局規格文件, 2026-05-03
+> Raw: [噪音監測與分佈（draft）](../../raw/taipei-dashboard-dataend/噪音監測與分佈.md); [噪音監測與分佈（spec）](../../raw/taipei-dashboard-dataend/2026-05-03-noise-monitoring-spec.md)
 
 ## Overview
 
@@ -55,15 +55,19 @@ Key columns: `station_id`, `city`, `district`, `noise_category`, `measurement_ye
 
 Upsert key: `(station_id, measurement_year, measurement_month)`.
 
-### `env_noise_quarterly_stats` — Quarterly Aggregation
+### `env_noise_quarterly_stats_tpe` / `env_noise_quarterly_stats_new_tpe` — Quarterly Aggregation
 
-Key columns: `city_scope` (`taipei`/`twin_city`), `noise_category`, `year`, `quarter`, `quarter_label`, `period` (`day`/`evening`/`night`), `avg_db`, `max_db`, `min_db`, `measurement_count`, `data_time`.
+Two city-split tables with identical structure (no `city_scope` column). Metro-area queries combine them with `UNION ALL` at query time.
 
-Computed by D990103; replaced in full on each run. Two `city_scope` rows are generated for every (year, quarter, noise_category, period) combination — one for Taipei only, one for both cities.
+Key columns: `station_name`, `noise_category`, `year`, `quarter`, `quarter_label`, `period` (`day`/`evening`/`night`), `avg_db`, `data_time`.
 
-### `env_noise_district_summary` — District Rollup
+Computed by D990103; replaced in full on each run. `quarter_label` format: `"2025Q1"`.
 
-Key columns: `city_scope`, `district`, `noise_category`, `year`, `quarter`, `avg_day_db`, `avg_evening_db`, `avg_night_db`, `station_count`, `measurement_count`, `exceed_count`, `exceed_rate`, `data_time`.
+### `env_noise_district_summary_tpe` / `env_noise_district_summary_new_tpe` — District Rollup
+
+Two city-split tables with identical structure (no `city_scope` column).
+
+Key columns: `district`, `noise_category`, `year`, `quarter`, `avg_day_db`, `avg_evening_db`, `avg_night_db`, `exceed_count`, `exceed_rate`, `data_time`.
 
 Also computed by D990103. `exceed_rate = exceed_count / measurement_count`.
 
@@ -73,7 +77,7 @@ Also computed by D990103. `exceed_rate = exceed_count / measurement_count`.
 |-----|----------|---------------|--------|
 | D990101 | `0 3 16 * *` (monthly 16th) | `env_noise_monthly_measurements`, `env_noise_stations` | HTML scraping (Taipei) |
 | D990102 | `0 4 1 1 *` (yearly Jan 1) | Same + geocoding | PDF parsing (New Taipei) |
-| D990103 | `0 6 16 * *` (monthly, after D990101) | `env_noise_quarterly_stats`, `env_noise_district_summary` | Derived aggregation |
+| D990103 | `0 6 16 * *` (monthly, after D990101) | `env_noise_quarterly_stats_tpe`, `env_noise_quarterly_stats_new_tpe`, `env_noise_district_summary_tpe`, `env_noise_district_summary_new_tpe` | Derived aggregation |
 
 D990102 also scrapes `/StaticPage/manual-stations` and `/StaticPage/auto-stations` to collect station addresses before geocoding.
 
@@ -130,6 +134,61 @@ Standards are stored per station in `env_noise_stations` and used at query time 
 | `add_point_wkbgeometry_column_to_df` | `utils/transform_spatial.py` | Build WKBGeometry from lng/lat |
 | `update_lasttime_in_data_to_dataset_info` | `utils/load_stage.py` | Sync `dataset_info` metadata |
 | `convert_str_to_time_format` | `utils/transform_time.py` | Normalize timestamps to ISO 8601 |
+
+## Deployment
+
+### First-time setup
+
+```bash
+# Step 1 — create dashboard DB tables
+docker cp db-sample-data/noise-monitoring-tables.sql postgres-data:/tmp/noise-monitoring-tables.sql
+docker exec postgres-data psql -U postgres -d dashboard -f /tmp/noise-monitoring-tables.sql
+
+# Step 2 — register component + dashboard in dashboardmanager
+docker cp db-sample-data/noise-monitoring-component.sql postgres-manager:/tmp/noise-monitoring-component.sql
+docker exec postgres-manager psql -U postgres -d dashboardmanager -f /tmp/noise-monitoring-component.sql
+docker cp db-sample-data/noise-monitoring-dashboard.sql postgres-manager:/tmp/noise-monitoring-dashboard.sql
+docker exec postgres-manager psql -U postgres -d dashboardmanager -f /tmp/noise-monitoring-dashboard.sql
+```
+
+### Schema re-deploy
+
+```bash
+docker exec postgres-data psql -U postgres -d dashboard -c \
+  "DROP TABLE IF EXISTS env_noise_stations, env_noise_monthly_measurements,
+   env_noise_quarterly_stats_tpe, env_noise_quarterly_stats_new_tpe,
+   env_noise_district_summary_tpe, env_noise_district_summary_new_tpe CASCADE;"
+```
+
+Then re-run Step 1–2 above.
+
+### Run ETL
+
+```bash
+# Steps 3–4: Taipei + New Taipei (can run in parallel)
+docker exec develop-airflow-webserver-1 airflow dags unpause proj_city_dashboard_D990101
+docker exec develop-airflow-webserver-1 airflow dags trigger proj_city_dashboard_D990101
+docker exec develop-airflow-webserver-1 airflow dags unpause proj_city_dashboard_D990102
+docker exec develop-airflow-webserver-1 airflow dags trigger proj_city_dashboard_D990102
+
+# Step 5: aggregation (after D990101 + D990102 etl tasks both succeed)
+docker exec develop-airflow-webserver-1 airflow dags unpause proj_city_dashboard_D990103
+docker exec develop-airflow-webserver-1 airflow dags trigger proj_city_dashboard_D990103
+```
+
+> Overall DAG status shows `failed` in test env because `update_dataset_info` cannot find `dataset_info`. Verify the `etl` task itself is `success`.
+
+### Verification queries
+
+```sql
+SELECT COUNT(*) FROM env_noise_stations WHERE city='臺北市';    -- expect 23
+SELECT COUNT(*) FROM env_noise_stations WHERE city='新北市';    -- expect 27
+SELECT COUNT(*) FROM env_noise_quarterly_stats_tpe;             -- expect ~360
+SELECT COUNT(*) FROM env_noise_quarterly_stats_new_tpe;         -- expect ~687
+SELECT COUNT(*) FROM env_noise_district_summary_tpe;            -- expect ~75
+SELECT COUNT(*) FROM env_noise_district_summary_new_tpe;        -- expect ~115
+SELECT year, quarter FROM env_noise_quarterly_stats_tpe ORDER BY year DESC, quarter DESC LIMIT 1;
+```
 
 ## See Also
 

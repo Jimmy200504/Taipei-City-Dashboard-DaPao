@@ -51,3 +51,7 @@
 ## [2026-05-02] ingest | Noise Monitoring ETL Pipeline
 
 - Updated: Noise Monitoring Backend Component
+
+## [2026-05-03] ingest | Noise Monitoring Backend Component (spec revision)
+
+- Updated: Noise Monitoring ETL Pipeline

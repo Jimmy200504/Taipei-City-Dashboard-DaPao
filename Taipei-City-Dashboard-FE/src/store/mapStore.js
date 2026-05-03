@@ -77,6 +77,10 @@ function isRiverRpiSegmentLayer(mapConfig) {
 	);
 }
 
+function isRiverRpiSiteLayer(mapConfig) {
+	return mapConfig?.index?.startsWith("env_river_sites_");
+}
+
 function getRiverRpiLinePaint() {
 	return {
 		"line-color": [
@@ -655,7 +659,7 @@ export const useMapStore = defineStore("map", {
 			const cityScope = map_config.index.endsWith("metrotaipei")
 				? "twin_city"
 				: "taipei";
-				const formatPowerDetail = (detail) => {
+			const formatPowerDetail = (detail) => {
 				if (!Array.isArray(detail) || !detail.length) return "—";
 				return detail.map((d) => `${d.kw}kW ×${d.count}`).join(" / ");
 			};
@@ -2238,11 +2242,23 @@ export const useMapStore = defineStore("map", {
 			}
 
 			// 取前 3 個不同圖層最近的 feature
-			const closestLayers = Object.keys(layerClosestFeature).slice(0, 3);
-			for (const layerId of closestLayers) {
-				const { feature } = layerClosestFeature[layerId];
+			let popupLayers = Object.keys(layerClosestFeature).map((layerId) => ({
+				feature: layerClosestFeature[layerId].feature,
+				mapConfig: this.mapConfigs[layerId],
+			}));
+			const hasRiverRpiSiteLayer = popupLayers.some(({ mapConfig }) =>
+				isRiverRpiSiteLayer(mapConfig),
+			);
+			if (hasRiverRpiSiteLayer) {
+				popupLayers = popupLayers.filter(
+					({ mapConfig }) => !isRiverRpiSegmentLayer(mapConfig),
+				);
+			}
+			popupLayers = popupLayers.slice(0, 3);
+
+			for (const { feature, mapConfig } of popupLayers) {
 				parsedPopupContent.push(feature);
-				mapConfigs.push(this.mapConfigs[layerId]);
+				mapConfigs.push(mapConfig);
 			}
 
 			if (!parsedPopupContent.length) return;
